@@ -45,6 +45,7 @@
 #include "../../utils.h"
 
 #include "httpd.h"
+#include "pantilthat.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
 #define V4L2_CTRL_TYPE_STRING_SUPPORTED
@@ -56,6 +57,9 @@
 static globals *pglobal;
 extern context servers[MAX_OUTPUT_PLUGINS];
 int piggy_fine = 2; // FIXME make it command line parameter
+
+int pt_x = 0;
+int pt_y = 0;
 
 /******************************************************************************
 Description.: initializes the iobuffer structure properly
@@ -1042,6 +1046,18 @@ void *client_thread(void *arg)
     iobuffer iobuf;
     request req;
     cfd lcfd; /* local-connected-file-descriptor */
+    int pan_degrees = 1; /* number of degrees to turn when moving */
+    
+    // pantilthat_set_servo(1, 0);
+    // pantilthat_set_servo(2, 0);
+    // OPRINT("Current Angle Servo 1: %i\n", pantilthat_get_servo(1));
+    // OPRINT("Current Angle Servo 2: %i\n", pantilthat_get_servo(2));
+
+    // pantilthat_set_servo(1,45);
+    // OPRINT("Current Angle Servo 1: %i\n", pantilthat_get_servo(1));
+
+    int pthx = pantilthat_get_servo(1);
+    int pthy = pantilthat_get_servo(2);
 
     /* we really need the fildescriptor and it must be freeable by us */
     if(arg != NULL) {
@@ -1088,6 +1104,172 @@ void *client_thread(void *arg)
         }
         #endif
     #endif
+    } else if(strstr(buffer, "GET /?action=pan_left") != NULL) {
+        int len;
+        req.type = A_PANTILT;
+        query_suffixed = 255;
+
+        /* advance by the length of known string */
+        if((pb = strstr(buffer, "GET /?action=pan_left")) == NULL) {
+            DBG("HTTP request seems to be malformed\n");
+            send_error(lcfd.fd, 400, "Malformed HTTP request");
+            close(lcfd.fd);
+            query_suffixed = 0;
+            return NULL;
+        }
+        pb += strlen("GET /?action=pan_left"); // a pb points to thestring after the first & after command
+
+        /* only accept certain characters */
+        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
+        req.parameter = malloc(len + 1);
+        if(req.parameter == NULL) {
+            exit(EXIT_FAILURE);
+        }
+        memset(req.parameter, 0, len + 1);
+        strncpy(req.parameter, pb, len);
+
+        if(unescape(req.parameter) == -1) {
+            free(req.parameter);
+            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
+            LOG("could not properly unescape command parameter string\n");
+            close(lcfd.fd);
+            return NULL;
+        }
+        pthx += pan_degrees;
+        pantilthat_set_servo(1,pthx);
+    } else if(strstr(buffer, "GET /?action=pan_right") != NULL) {
+        int len;
+        req.type = A_PANTILT;
+        query_suffixed = 255;
+
+        /* advance by the length of known string */
+        if((pb = strstr(buffer, "GET /?action=pan_right")) == NULL) {
+            DBG("HTTP request seems to be malformed\n");
+            send_error(lcfd.fd, 400, "Malformed HTTP request");
+            close(lcfd.fd);
+            query_suffixed = 0;
+            return NULL;
+        }
+        pb += strlen("GET /?action=pan_right"); // a pb points to thestring after the first & after command
+
+        /* only accept certain characters */
+        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
+        req.parameter = malloc(len + 1);
+        if(req.parameter == NULL) {
+            exit(EXIT_FAILURE);
+        }
+        memset(req.parameter, 0, len + 1);
+        strncpy(req.parameter, pb, len);
+
+        if(unescape(req.parameter) == -1) {
+            free(req.parameter);
+            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
+            LOG("could not properly unescape command parameter string\n");
+            close(lcfd.fd);
+            return NULL;
+        }
+
+        pthx -= pan_degrees;
+        pantilthat_set_servo(1,pthx);
+    } else if(strstr(buffer, "GET /?action=pan_up") != NULL) {
+        int len;
+        req.type = A_PANTILT;
+        query_suffixed = 255;
+
+        /* advance by the length of known string */
+        if((pb = strstr(buffer, "GET /?action=pan_up")) == NULL) {
+            DBG("HTTP request seems to be malformed\n");
+            send_error(lcfd.fd, 400, "Malformed HTTP request");
+            close(lcfd.fd);
+            query_suffixed = 0;
+            return NULL;
+        }
+        pb += strlen("GET /?action=pan_up"); // a pb points to thestring after the first & after command
+
+        /* only accept certain characters */
+        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
+        req.parameter = malloc(len + 1);
+        if(req.parameter == NULL) {
+            exit(EXIT_FAILURE);
+        }
+        memset(req.parameter, 0, len + 1);
+        strncpy(req.parameter, pb, len);
+
+        if(unescape(req.parameter) == -1) {
+            free(req.parameter);
+            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
+            LOG("could not properly unescape command parameter string\n");
+            close(lcfd.fd);
+            return NULL;
+        }
+
+        pthy -= pan_degrees;
+        pantilthat_set_servo(2,pthy);
+    } else if(strstr(buffer, "GET /?action=pan_down") != NULL) {
+        int len;
+        req.type = A_PANTILT;
+        query_suffixed = 255;
+
+        /* advance by the length of known string */
+        if((pb = strstr(buffer, "GET /?action=pan_down")) == NULL) {
+            DBG("HTTP request seems to be malformed\n");
+            send_error(lcfd.fd, 400, "Malformed HTTP request");
+            close(lcfd.fd);
+            query_suffixed = 0;
+            return NULL;
+        }
+        pb += strlen("GET /?action=pan_down"); // a pb points to thestring after the first & after command
+
+        /* only accept certain characters */
+        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
+        req.parameter = malloc(len + 1);
+        if(req.parameter == NULL) {
+            exit(EXIT_FAILURE);
+        }
+        memset(req.parameter, 0, len + 1);
+        strncpy(req.parameter, pb, len);
+
+        if(unescape(req.parameter) == -1) {
+            free(req.parameter);
+            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
+            LOG("could not properly unescape command parameter string\n");
+            close(lcfd.fd);
+            return NULL;
+        }
+
+        pthy += pan_degrees;
+        pantilthat_set_servo(2,pthy);
+     } else if(strstr(buffer, "GET /?action=pan_position") != NULL) {
+        int len;
+        req.type = A_PANTILT;
+        query_suffixed = 255;
+
+        /* advance by the length of known string */
+        if((pb = strstr(buffer, "GET /?action=pan_position")) == NULL) {
+            DBG("HTTP request seems to be malformed\n");
+            send_error(lcfd.fd, 400, "Malformed HTTP request");
+            close(lcfd.fd);
+            query_suffixed = 0;
+            return NULL;
+        }
+        pb += strlen("GET /?action=pan_position"); // a pb points to thestring after the first & after command
+
+        /* only accept certain characters */
+        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
+        req.parameter = malloc(len + 1);
+        if(req.parameter == NULL) {
+            exit(EXIT_FAILURE);
+        }
+        memset(req.parameter, 0, len + 1);
+        strncpy(req.parameter, pb, len);
+
+        if(unescape(req.parameter) == -1) {
+            free(req.parameter);
+            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
+            LOG("could not properly unescape command parameter string\n");
+            close(lcfd.fd);
+            return NULL;
+        }
     } else if(strstr(buffer, "POST /stream") != NULL) {
         req.type = A_STREAM;
         query_suffixed = 255;
@@ -1414,6 +1596,20 @@ void *client_thread(void *arg)
     case A_CGI:
         DBG("cgi script: %s requested\n", req.parameter);
         execute_cgi(lcfd.pc->id, lcfd.fd, req.parameter, req.query_string);
+        break;
+    case A_PANTILT:
+        DBG("Pan Tilt %s requested\n", req.query_string);
+
+        /* Send HTTP-response */
+        sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                "Content-type: application/json\r\n" \
+                STD_HEADER \
+                "\r\n" \
+                "{\"x\": %d,\"y\": %d}", pthx, pthy);
+
+        if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {
+            DBG("write failed, done anyway\n");
+        }
         break;
     default:
         DBG("unknown request\n");

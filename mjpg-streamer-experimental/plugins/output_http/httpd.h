@@ -90,6 +90,7 @@ typedef enum {
     A_COMMAND,
     A_FILE,
     A_CGI,
+    A_PANTILT,
     A_TAKE,
     A_INPUT_JSON,
     A_OUTPUT_JSON,

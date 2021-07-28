@@ -41,6 +41,8 @@
 #include "../../utils.h"
 #include "httpd.h"
 
+#include "pantilthat.h"
+
 #define OUTPUT_PLUGIN_NAME "HTTP output plugin"
 /*
  * keep context for each server
@@ -194,6 +196,21 @@ int output_init(output_parameter *param, int id)
 
     param->global->out[id].name = malloc((strlen(OUTPUT_PLUGIN_NAME) + 1) * sizeof(char));
     sprintf(param->global->out[id].name, OUTPUT_PLUGIN_NAME);
+
+    /* init the pantilt stuff */
+    // May rise an exception if the system is unable to create an instance
+    // pantilthat * pth = new pantilthat();
+
+    OPRINT("\n[INFO] checking the Pan-Tilt HAT module...\n\n");
+
+    pantilthat_init();
+
+    // Initial configuration
+    // if (!pth->setup())
+    if (!pantilthat_setup())
+    {
+        OPRINT("[FATAL] Could not initialize Pan-Tilt HAT module. Aborting.\n");
+    }
 
     return 0;
 }
