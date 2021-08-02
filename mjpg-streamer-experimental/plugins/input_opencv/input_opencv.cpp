@@ -275,6 +275,16 @@ int input_init(input_parameter *param, int plugin_no)
     pctx->capture.set(CAP_PROP_FRAME_WIDTH, width);
     pctx->capture.set(CAP_PROP_FRAME_HEIGHT, height);
     
+    // try to set awb off 
+    //cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+    //cap.set(cv2.CAP_PROP_GAMMA, 4000)
+    //cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+
+    IPRINT("Attempting to turn off auto exposure and whitebackground\n");
+    pctx->capture.set(CAP_PROP_AUTO_EXPOSURE, 0);
+    pctx->capture.set(CAP_PROP_AUTO_WB, 0);
+    pctx->capture.set(CAP_PROP_GAIN, 0);
+
     if (settings->fps_set)
         pctx->capture.set(CAP_PROP_FPS, settings->fps);
     

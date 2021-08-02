@@ -56,11 +56,18 @@
 
 static globals *pglobal;
 extern context servers[MAX_OUTPUT_PLUGINS];
+
+static int pthx;
+static int pthy;
+
 int piggy_fine = 2; // FIXME make it command line parameter
 
-int pt_x = 0;
-int pt_y = 0;
-
+//int pt_x = 0;
+//int pt_y = 0;
+//int pthx = pantilthat_get_servo(1);
+//int pthy = pantilthat_get_servo(2);
+//int pthx = 0;
+//int pthy = 0;
 /******************************************************************************
 Description.: initializes the iobuffer structure properly
 Input Value.: pointer to already allocated iobuffer
@@ -1056,8 +1063,8 @@ void *client_thread(void *arg)
     // pantilthat_set_servo(1,45);
     // OPRINT("Current Angle Servo 1: %i\n", pantilthat_get_servo(1));
 
-    int pthx = pantilthat_get_servo(1);
-    int pthy = pantilthat_get_servo(2);
+    pthx = pantilthat_get_servo(1);
+    pthy = pantilthat_get_servo(2);
 
     /* we really need the fildescriptor and it must be freeable by us */
     if(arg != NULL) {

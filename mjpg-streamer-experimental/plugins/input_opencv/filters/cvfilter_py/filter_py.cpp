@@ -12,6 +12,8 @@
 #include <Python.h>
 #include "conversion.h"
 
+#include "../../../../mjpg_streamer.h"
+
 using namespace cv;
 using namespace std;
 
@@ -141,6 +143,10 @@ bool filter_init(const char * args, void** filter_ctx) {
         return false;
     }
     
+
+// debug stuff for passing variables around
+    OPRINT("\n[INFO] Value of pglobal.incnt: %s\n\n", pModuleName);
+
     // done with initialization, let go of the GIL
     ctx->pMainThread = PyEval_SaveThread();
     return true;
