@@ -59,8 +59,11 @@ extern context servers[MAX_OUTPUT_PLUGINS];
 
 static int pthx;
 static int pthy;
+//static bool isRecording = false;
 
 int piggy_fine = 2; // FIXME make it command line parameter
+
+char *recordingIPAddress;
 
 //int pt_x = 0;
 //int pt_y = 0;
@@ -1053,16 +1056,8 @@ void *client_thread(void *arg)
     iobuffer iobuf;
     request req;
     cfd lcfd; /* local-connected-file-descriptor */
+    // Pan Tilt Hat variables
     int pan_degrees = 1; /* number of degrees to turn when moving */
-    
-    // pantilthat_set_servo(1, 0);
-    // pantilthat_set_servo(2, 0);
-    // OPRINT("Current Angle Servo 1: %i\n", pantilthat_get_servo(1));
-    // OPRINT("Current Angle Servo 2: %i\n", pantilthat_get_servo(2));
-
-    // pantilthat_set_servo(1,45);
-    // OPRINT("Current Angle Servo 1: %i\n", pantilthat_get_servo(1));
-
     pthx = pantilthat_get_servo(1);
     pthy = pantilthat_get_servo(2);
 
@@ -1111,172 +1106,67 @@ void *client_thread(void *arg)
         }
         #endif
     #endif
+    } else if(strstr(buffer, "GET /?action=recordon") != NULL) {
+        req.type = A_RECORD;
+
+        if(pglobal->isRecording == 1) {
+            // recording already on
+
+        } else {
+            pglobal->isRecording = 1;
+            #ifdef MANAGMENT
+                unsigned int i = 0;
+                int addr_length = strlen(lcfd.client->address) + 1;
+                recordingIPAddress = malloc(addr_length * sizeof(char));
+
+                strcpy(recordingIPAddress, lcfd.client->address);
+            #endif
+        }
+    } else if(strstr(buffer, "GET /?action=recordoff") != NULL) {
+        req.type = A_RECORD;
+
+        if(pglobal->isRecording == 0) {
+            // recording already off
+        
+        } else {
+            #ifdef MANAGMENT
+                // if(recordingIPAddress == lcfd.client->address) {
+                 if(recordingIPAddress != NULL && strcmp(lcfd.client->address, recordingIPAddress) == 0) {
+                    pglobal->isRecording = 0;
+                    recordingIPAddress = NULL;
+                } // only allow owner (based on IP)
+            #else
+                pglobal->isRecording = 0;
+            #endif
+        }
     } else if(strstr(buffer, "GET /?action=pan_left") != NULL) {
-        int len;
         req.type = A_PANTILT;
-        query_suffixed = 255;
-
-        /* advance by the length of known string */
-        if((pb = strstr(buffer, "GET /?action=pan_left")) == NULL) {
-            DBG("HTTP request seems to be malformed\n");
-            send_error(lcfd.fd, 400, "Malformed HTTP request");
-            close(lcfd.fd);
-            query_suffixed = 0;
-            return NULL;
-        }
-        pb += strlen("GET /?action=pan_left"); // a pb points to thestring after the first & after command
-
-        /* only accept certain characters */
-        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
-        req.parameter = malloc(len + 1);
-        if(req.parameter == NULL) {
-            exit(EXIT_FAILURE);
-        }
-        memset(req.parameter, 0, len + 1);
-        strncpy(req.parameter, pb, len);
-
-        if(unescape(req.parameter) == -1) {
-            free(req.parameter);
-            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
-            LOG("could not properly unescape command parameter string\n");
-            close(lcfd.fd);
-            return NULL;
-        }
+       
         pthx += pan_degrees;
-        pantilthat_set_servo(1,pthx);
+        pantilthat_set_servo(1, pthx);
     } else if(strstr(buffer, "GET /?action=pan_right") != NULL) {
-        int len;
         req.type = A_PANTILT;
-        query_suffixed = 255;
-
-        /* advance by the length of known string */
-        if((pb = strstr(buffer, "GET /?action=pan_right")) == NULL) {
-            DBG("HTTP request seems to be malformed\n");
-            send_error(lcfd.fd, 400, "Malformed HTTP request");
-            close(lcfd.fd);
-            query_suffixed = 0;
-            return NULL;
-        }
-        pb += strlen("GET /?action=pan_right"); // a pb points to thestring after the first & after command
-
-        /* only accept certain characters */
-        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
-        req.parameter = malloc(len + 1);
-        if(req.parameter == NULL) {
-            exit(EXIT_FAILURE);
-        }
-        memset(req.parameter, 0, len + 1);
-        strncpy(req.parameter, pb, len);
-
-        if(unescape(req.parameter) == -1) {
-            free(req.parameter);
-            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
-            LOG("could not properly unescape command parameter string\n");
-            close(lcfd.fd);
-            return NULL;
-        }
 
         pthx -= pan_degrees;
-        pantilthat_set_servo(1,pthx);
+        pantilthat_set_servo(1, pthx);
     } else if(strstr(buffer, "GET /?action=pan_up") != NULL) {
-        int len;
         req.type = A_PANTILT;
-        query_suffixed = 255;
-
-        /* advance by the length of known string */
-        if((pb = strstr(buffer, "GET /?action=pan_up")) == NULL) {
-            DBG("HTTP request seems to be malformed\n");
-            send_error(lcfd.fd, 400, "Malformed HTTP request");
-            close(lcfd.fd);
-            query_suffixed = 0;
-            return NULL;
-        }
-        pb += strlen("GET /?action=pan_up"); // a pb points to thestring after the first & after command
-
-        /* only accept certain characters */
-        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
-        req.parameter = malloc(len + 1);
-        if(req.parameter == NULL) {
-            exit(EXIT_FAILURE);
-        }
-        memset(req.parameter, 0, len + 1);
-        strncpy(req.parameter, pb, len);
-
-        if(unescape(req.parameter) == -1) {
-            free(req.parameter);
-            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
-            LOG("could not properly unescape command parameter string\n");
-            close(lcfd.fd);
-            return NULL;
-        }
-
+        
         pthy -= pan_degrees;
-        pantilthat_set_servo(2,pthy);
+        pantilthat_set_servo(2, pthy);
     } else if(strstr(buffer, "GET /?action=pan_down") != NULL) {
-        int len;
         req.type = A_PANTILT;
-        query_suffixed = 255;
-
-        /* advance by the length of known string */
-        if((pb = strstr(buffer, "GET /?action=pan_down")) == NULL) {
-            DBG("HTTP request seems to be malformed\n");
-            send_error(lcfd.fd, 400, "Malformed HTTP request");
-            close(lcfd.fd);
-            query_suffixed = 0;
-            return NULL;
-        }
-        pb += strlen("GET /?action=pan_down"); // a pb points to thestring after the first & after command
-
-        /* only accept certain characters */
-        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
-        req.parameter = malloc(len + 1);
-        if(req.parameter == NULL) {
-            exit(EXIT_FAILURE);
-        }
-        memset(req.parameter, 0, len + 1);
-        strncpy(req.parameter, pb, len);
-
-        if(unescape(req.parameter) == -1) {
-            free(req.parameter);
-            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
-            LOG("could not properly unescape command parameter string\n");
-            close(lcfd.fd);
-            return NULL;
-        }
-
+       
         pthy += pan_degrees;
-        pantilthat_set_servo(2,pthy);
-     } else if(strstr(buffer, "GET /?action=pan_position") != NULL) {
-        int len;
+        pantilthat_set_servo(2, pthy);
+    } else if(strstr(buffer, "GET /?action=status") != NULL) {
         req.type = A_PANTILT;
-        query_suffixed = 255;
-
-        /* advance by the length of known string */
-        if((pb = strstr(buffer, "GET /?action=pan_position")) == NULL) {
-            DBG("HTTP request seems to be malformed\n");
-            send_error(lcfd.fd, 400, "Malformed HTTP request");
-            close(lcfd.fd);
-            query_suffixed = 0;
-            return NULL;
-        }
-        pb += strlen("GET /?action=pan_position"); // a pb points to thestring after the first & after command
-
-        /* only accept certain characters */
-        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
-        req.parameter = malloc(len + 1);
-        if(req.parameter == NULL) {
-            exit(EXIT_FAILURE);
-        }
-        memset(req.parameter, 0, len + 1);
-        strncpy(req.parameter, pb, len);
-
-        if(unescape(req.parameter) == -1) {
-            free(req.parameter);
-            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
-            LOG("could not properly unescape command parameter string\n");
-            close(lcfd.fd);
-            return NULL;
-        }
+        // #ifdef MANAGMENT
+        // if (check_client_status(lcfd.client)) {
+        //     req.type = A_UNKNOWN;
+        //     send_error(lcfd.fd, 403, "status client error");
+        // }
+        // #endif
     } else if(strstr(buffer, "POST /stream") != NULL) {
         req.type = A_STREAM;
         query_suffixed = 255;
@@ -1506,124 +1396,158 @@ void *client_thread(void *arg)
     }
 
     switch(req.type) {
-    case A_SNAPSHOT_WXP:
-    case A_SNAPSHOT:
-        DBG("Request for snapshot from input: %d\n", input_number);
-        send_snapshot(&lcfd, input_number);
-        break;
-    case A_STREAM:
-        DBG("Request for stream from input: %d\n", input_number);
-        send_stream(&lcfd, input_number);
-        break;
-    #ifdef WXP_COMPAT
-    case A_STREAM_WXP:
-        DBG("Request for WXP compat stream from input: %d\n", input_number);
-        send_stream_wxp(&lcfd, input_number);
-        break;
-    #endif
-    case A_COMMAND:
-        if(lcfd.pc->conf.nocommands) {
-            send_error(lcfd.fd, 501, "this server is configured to not accept commands");
+        case A_SNAPSHOT_WXP:
+        case A_SNAPSHOT:
+            DBG("Request for snapshot from input: %d\n", input_number);
+            send_snapshot(&lcfd, input_number);
             break;
-        }
-        command(lcfd.pc->id, lcfd.fd, req.parameter);
-        break;
-    case A_INPUT_JSON:
-        DBG("Request for the Input plugin descriptor JSON file\n");
-        send_input_JSON(lcfd.fd, input_number);
-        break;
-    case A_OUTPUT_JSON:
-        DBG("Request for the Output plugin descriptor JSON file\n");
-        send_output_JSON(lcfd.fd, input_number);
-        break;
-    case A_PROGRAM_JSON:
-        DBG("Request for the program descriptor JSON file\n");
-        send_program_JSON(lcfd.fd);
-        break;
-    #ifdef MANAGMENT
-    case A_CLIENTS_JSON:
-        DBG("Request for the clients JSON file\n");
-        send_clients_JSON(lcfd.fd);
-        break;
-    #endif
-    case A_FILE:
-        if(lcfd.pc->conf.www_folder == NULL)
-            send_error(lcfd.fd, 501, "no www-folder configured");
-        else
-            send_file(lcfd.pc->id, lcfd.fd, req.parameter);
-        break;
-    /*
-        With the take argument we try to save the current image to file before we transmit it to the user.
-        This is done trough the output_file plugin.
-        If it not loaded, or the file could not be saved then we won't transmit the frame.
-    */
-    case A_TAKE: {
-        int i, ret = 0, found = 0;
-        for (i = 0; i<pglobal->outcnt; i++) {
-            if (pglobal->out[i].name != NULL) {
-                if (strstr(pglobal->out[i].name, "FILE output plugin")) {
-                    found = 255;
-                    DBG("output_file found id: %d\n", i);
-                    char *filename = NULL;
-                    char *filenamearg = NULL;
-                    int len = 0;
-                    DBG("Buffer: %s \n", req.parameter);
-                    if((filename = strstr(req.parameter, "filename=")) != NULL) {
-                        filename += strlen("filename=");
-                        char *fn = strchr(filename, '&');
-                        if (fn == NULL)
-                            len = strlen(filename);
-                        else
-                            len = (int)(fn - filename);
-                        filenamearg = (char*)calloc(len, sizeof(char));
-                        memcpy(filenamearg, filename, len);
-                        DBG("Filename = %s\n", filenamearg);
-                        //int output_cmd(int plugin_id, unsigned int control_id, unsigned int group, int value, char *valueStr)
-                        ret = pglobal->out[i].cmd(i, OUT_FILE_CMD_TAKE, IN_CMD_GENERIC, 0, filenamearg);
-                    } else {
-                        DBG("filename is not specified int the URL\n");
-                        send_error(lcfd.fd, 404, "The &filename= must present for the take command in the URL");
+        case A_STREAM:
+            DBG("Request for stream from input: %d\n", input_number);
+            send_stream(&lcfd, input_number);
+            break;
+        #ifdef WXP_COMPAT
+        case A_STREAM_WXP:
+            DBG("Request for WXP compat stream from input: %d\n", input_number);
+            send_stream_wxp(&lcfd, input_number);
+            break;
+        #endif
+        case A_COMMAND:
+            if(lcfd.pc->conf.nocommands) {
+                send_error(lcfd.fd, 501, "this server is configured to not accept commands");
+                break;
+            }
+            command(lcfd.pc->id, lcfd.fd, req.parameter);
+            break;
+        case A_INPUT_JSON:
+            DBG("Request for the Input plugin descriptor JSON file\n");
+            send_input_JSON(lcfd.fd, input_number);
+            break;
+        case A_OUTPUT_JSON:
+            DBG("Request for the Output plugin descriptor JSON file\n");
+            send_output_JSON(lcfd.fd, input_number);
+            break;
+        case A_PROGRAM_JSON:
+            DBG("Request for the program descriptor JSON file\n");
+            send_program_JSON(lcfd.fd);
+            break;
+        #ifdef MANAGMENT
+        case A_CLIENTS_JSON:
+            DBG("Request for the clients JSON file\n");
+            send_clients_JSON(lcfd.fd);
+            break;
+        #endif
+        case A_FILE:
+            if(lcfd.pc->conf.www_folder == NULL)
+                send_error(lcfd.fd, 501, "no www-folder configured");
+            else
+                send_file(lcfd.pc->id, lcfd.fd, req.parameter);
+            break;
+        /*
+            With the take argument we try to save the current image to file before we transmit it to the user.
+            This is done trough the output_file plugin.
+            If it not loaded, or the file could not be saved then we won't transmit the frame.
+        */
+        case A_TAKE: {
+            int i, ret = 0, found = 0;
+            for (i = 0; i<pglobal->outcnt; i++) {
+                if (pglobal->out[i].name != NULL) {
+                    if (strstr(pglobal->out[i].name, "FILE output plugin")) {
+                        found = 255;
+                        DBG("output_file found id: %d\n", i);
+                        char *filename = NULL;
+                        char *filenamearg = NULL;
+                        int len = 0;
+                        DBG("Buffer: %s \n", req.parameter);
+                        if((filename = strstr(req.parameter, "filename=")) != NULL) {
+                            filename += strlen("filename=");
+                            char *fn = strchr(filename, '&');
+                            if (fn == NULL)
+                                len = strlen(filename);
+                            else
+                                len = (int)(fn - filename);
+                            filenamearg = (char*)calloc(len, sizeof(char));
+                            memcpy(filenamearg, filename, len);
+                            DBG("Filename = %s\n", filenamearg);
+                            //int output_cmd(int plugin_id, unsigned int control_id, unsigned int group, int value, char *valueStr)
+                            ret = pglobal->out[i].cmd(i, OUT_FILE_CMD_TAKE, IN_CMD_GENERIC, 0, filenamearg);
+                        } else {
+                            DBG("filename is not specified int the URL\n");
+                            send_error(lcfd.fd, 404, "The &filename= must present for the take command in the URL");
+                        }
+                        break;
                     }
-                    break;
                 }
             }
-        }
 
-        if (found == 0) {
-            LOG("FILE CHANGE TEST output plugin not loaded\n");
-            send_error(lcfd.fd, 404, "FILE output plugin not loaded, taking snapshot not possible");
-        } else {
-            if (ret == 0) {
-                send_snapshot(&lcfd, input_number);
+            if (found == 0) {
+                LOG("FILE CHANGE TEST output plugin not loaded\n");
+                send_error(lcfd.fd, 404, "FILE output plugin not loaded, taking snapshot not possible");
             } else {
-                send_error(lcfd.fd, 404, "Taking snapshot failed!");
+                if (ret == 0) {
+                    send_snapshot(&lcfd, input_number);
+                } else {
+                    send_error(lcfd.fd, 404, "Taking snapshot failed!");
+                }
             }
-        }
-        } break;
-    case A_CGI:
-        DBG("cgi script: %s requested\n", req.parameter);
-        execute_cgi(lcfd.pc->id, lcfd.fd, req.parameter, req.query_string);
-        break;
-    case A_PANTILT:
-        DBG("Pan Tilt %s requested\n", req.query_string);
+            } break;
+        case A_CGI:
+            DBG("cgi script: %s requested\n", req.parameter);
+            execute_cgi(lcfd.pc->id, lcfd.fd, req.parameter, req.query_string);
+            break;
+        case A_PANTILT:
+            DBG("Status %s requested\n", req.query_string);
+            // #ifdef MANAGMENT
+            //     OPRINT("IP: %s\n", lcfd.client->address);
+            // #endif
+            
+            sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                    "Content-type: application/json\r\n" \
+                    STD_HEADER \
+                    "\r\n" \
+                    "{\"pth_x\": %d,\"pth_y\": %d, \"isRecording\": %d}", pthx, pthy, pglobal->isRecording);
 
-        /* Send HTTP-response */
-        sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
-                "Content-type: application/json\r\n" \
-                STD_HEADER \
-                "\r\n" \
-                "{\"x\": %d,\"y\": %d}", pthx, pthy);
+            if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {
+                DBG("write failed, done anyway\n");
+            }
+            break;
+        case A_RECORD:
+           // DBG("Record Message: %s\n", recordRetMsg);
+            #ifdef MANAGMENT
+                // if(strcmp(recordingIPAddress, lcfd.client->address) == 0) {
+                //if(strstr(recordingIPAddress, lcfd.client->address) != NULL) {
+                // if(recordingIPAddress != NULL && strstr(recordingIPAddress, lcfd.client->address) != NULL) {
+                if(recordingIPAddress != NULL && strcmp(lcfd.client->address, recordingIPAddress) != 0) {
+                    sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                            "Content-type: application/json\r\n" \
+                            STD_HEADER \
+                            "\r\n" \
+                            "{\"message\": \"Recording is controlled by another IP\", \"ip\": \"%s\", \"ip\": \"%s\"}", recordingIPAddress, lcfd.client->address);
+                } else {
+                    sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                            "Content-type: application/json\r\n" \
+                            STD_HEADER  \
+                            "\r\n" \
+                            "{\"message\": \"None\"}");
+                }
+            #else
+                sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                        "Content-type: application/json\r\n" \
+                        STD_HEADER \
+                        "\r\n" \
+                        "{\"message\": \"None\"}");
+            #endif
 
-        if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {
-            DBG("write failed, done anyway\n");
-        }
-        break;
-    default:
-        DBG("unknown request\n");
+            if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {
+                DBG("write failed, done anyway\n");
+            }
+            break;
+        default:
+            DBG("unknown request\n");
     }
 
     close(lcfd.fd);
     free_request(&req);
+    // free(recordRetMsg);
 
     DBG("leaving HTTP client thread\n");
     return NULL;

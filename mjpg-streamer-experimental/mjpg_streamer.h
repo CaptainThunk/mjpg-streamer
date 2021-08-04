@@ -90,6 +90,9 @@ struct _globals {
 
     /* pointer to control functions */
     //int (*control)(int command, char *details);
+    int isRecording;
+    //int pth_pan;
+    //int pth_tilt;
 };
 
 #endif

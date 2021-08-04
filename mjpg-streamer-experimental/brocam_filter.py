@@ -18,36 +18,54 @@ class MyFilter:
 
     # directory to save the ouput frames
     pathIn = "/home/pi/debug/"
+    pathOut = "/home/pi/Videos/"
 
     debugMode = True
-    debugModeWriteImage = True
+    debugModeWriteImage = False
 
-    frame_count = 0
-    consecutive_frame = 3       # this provides better resolution of a moving object, but the higher the value the more of the moving objects "ghost" it will catch, a larger area covering where it once
-    background_image_count = 0
+    #frame_count = 0
+    consecutive_frame = 2       # this provides better resolution of a moving object, but the higher the value the more of the moving objects "ghost" it will catch, a larger area covering where it once
+   # background_image_count = 0
     setup_initialised = False   # determine if ready to start processing or build up initialisation data
     background_initialised = False # determine if background is available (finsihed in thread)
     background_frames = []      # store for background frames - will use background_frame_count_span for length
     frame_diff_list = []
     background_median_size = 10         # 25
-    background_frame_count_span = 150   # Number of frames to save for determining the background (assume approx 5 fps) - should always be higher than background_median_size 150
+    background_frame_count_span = 50   # Number of frames to save for determining the background (assume approx 5 fps) - should always be higher than background_median_size 150
     background = np.array([])
     o_datetime = 0
     last_background_update_ts = 0
-    background_update_time = 300    # in seconds, how often to regenerate the background
+    background_update_time = 120    # in seconds, how often to regenerate the background 300 default (5 mins)
     rebuild_background = False
     is_background_building = False
+    
     pthPan = 0
     pthTilt = 0
 
-    def process(self, img):
+    recordMode = False
+    videoOutput = None
+    recordData = True       # records with all added information, False it will be just the raw image
+    videoFPS = 5
+
+    def process(self, img, isRecording):
         '''
             :param img: A numpy array representing the input image
+            :param isRecording: An Int sent from output_http indicating whether script should be recording or not
             :returns: A numpy array to send to the mjpg-streamer output plugin
         '''
         # Constants
         motionThreshold = 500
-        self.pthPan = pantilthat.get_pan ()
+
+        if(pantilthat.get_pan() != self.pthPan or pantilthat.get_tilt() != self.pthTilt):
+            self.setup_initialised = False
+            self.background_initialised = False
+            self.rebuild_background = False
+            self.is_background_building = False
+            self.background_frames = []
+            #self.frame_count = 0
+            #self.background_image_count = 0
+
+        self.pthPan = pantilthat.get_pan()
         self.pthTilt = pantilthat.get_tilt()
         #print("Pan: "+str(self.pthPan))
         #print("Tilt: "+str(self.pthTilt))
@@ -62,23 +80,49 @@ class MyFilter:
 
         valid_cntrs = 0
 
+        # print("Is Recording: "+str(isRecording))
        # self.background = img.copy() # just set up the variable with cur image
 
         # get datetime object
         self.o_datetime = datetime.datetime.now()
+
+        # recording
+
+        # turn recording on
+        if(not self.recordMode and isRecording == 1):
+            self.recordMode = True
+
+            timeText = self.o_datetime.strftime("%X")
+            self.videoOutput = cv2.VideoWriter(
+                self.pathOut+'carcam_'+str(self.o_datetime.strftime("%d-%m-%Y"))+'_'+str(self.o_datetime.strftime("%H-%M-%S"))+'.mp4',
+                cv2.VideoWriter_fourcc(*'mp4v'), self.videoFPS,
+                (img_w, img_h)
+            )
+
+    
+        # turn recording off
+        if(self.recordMode and isRecording == 0):
+            self.recordMode = False
+            self.videoOutput.release()
+        
+        # add to file
+        if(self.recordMode and not self.recordData):
+            self.videoOutput.write(img)
+        
+        # end recording
 
 
         # if not initialised, setup the background image - take x amount of frames and use a random sample of y frames to determine a median image which will remove currently moving objects
         if(self.setup_initialised == False):
             # add image to background_frames list
             self.background_frames.append(img.copy())
-            self.background_image_count = self.background_image_count + 1
+            #self.background_image_count = self.background_image_count + 1
 
             if(self.debugMode):
-                print("Debug Initialising Frame: "+str(self.background_image_count))
+                print("Debug Initialising Frame: "+str(len(self.background_frames)))
 
             # if threshold reached do the median calculation and finish initialisation by setting to true
-            if(self.background_image_count >= self.background_frame_count_span):
+            if(len(self.background_frames) >= self.background_frame_count_span):
                 # self.process_background(self.background_median_size)
                 self.setup_initialised = True
                 self.is_background_building = True
@@ -87,7 +131,7 @@ class MyFilter:
                 
         else:
             if(self.background_initialised):
-                self.frame_count = self.frame_count + 1
+                #self.frame_count = self.frame_count + 1
                 
                 # remove first frame from background_frames and then add img
                 #self.background_frames.pop(0)  # pop causes memoryleak
@@ -291,7 +335,7 @@ class MyFilter:
             debugUpdateTime = debugUpdateTime+str(self.background_update_time)+" seconds"
             dbgCountdown = 0
             if(self.last_background_update_ts != 0):
-                dbgCountdown = 300 - int(datetime.datetime.now().timestamp()-self.last_background_update_ts)
+                dbgCountdown = self.background_update_time - int(datetime.datetime.now().timestamp()-self.last_background_update_ts)
             debugNextUpdate = debugNextUpdate+str(dbgCountdown)+" seconds"
 
             # get coords based on boundary
@@ -359,6 +403,10 @@ class MyFilter:
             centerTextX = img_w2 - int(initMsgX / 2)
             centerTextY = img_h2 - int(initMsgY / 2)
             cv2.putText(img, initMsg, (centerTextX, centerTextY), self.font, 1, (200, 200, 200), 2)
+
+        # add to file with data
+        if(self.recordMode and self.recordData):
+            self.videoOutput.write(img)
 
         return img
     

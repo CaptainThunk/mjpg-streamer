@@ -21,7 +21,7 @@ using namespace std;
 extern "C" {
     bool filter_init(const char * args, void** filter_ctx);
     Mat filter_init_frame(void* filter_ctx);
-    void filter_process(void* filter_ctx, Mat &src, Mat &dst);
+    void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording);
     void filter_free(void* filter_ctx);
 }
 
@@ -145,7 +145,7 @@ bool filter_init(const char * args, void** filter_ctx) {
     
 
 // debug stuff for passing variables around
-    OPRINT("\n[INFO] Value of pglobal.incnt: %s\n\n", pModuleName);
+    //OPRINT("\n[INFO] Value of pglobal.incnt: %s\n\n", pModuleName);
 
     // done with initialization, let go of the GIL
     ctx->pMainThread = PyEval_SaveThread();
@@ -174,12 +174,16 @@ Mat filter_init_frame(void *filter_ctx) {
 /**
     Called by the OpenCV plugin upon each frame
 */
-void filter_process(void* filter_ctx, Mat &src, Mat &dst) {
+void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording) {
     
     Context *ctx = (Context*)filter_ctx;
     PyObject *ndArray, *pArgs;
-    
+    PyObject *recordingState;
+
     PyGILState_STATE gil_state = PyGILState_Ensure();
+
+    //fprintf(stderr, "isRecording \"%i\"\n", isRecording);
+    recordingState =Py_BuildValue("i",isRecording);
     
     ndArray = ctx->converter.toNDArray(src);
     if (ndArray == NULL) {
@@ -189,9 +193,9 @@ void filter_process(void* filter_ctx, Mat &src, Mat &dst) {
         return;
     }
         
-    pArgs = PyTuple_New(1);
+    pArgs = PyTuple_New(2);
     PyTuple_SetItem(pArgs, 0, ndArray); // takes ownership of ndarray
-    
+    PyTuple_SetItem(pArgs, 1, recordingState);
     // see below for rationale
     Py_XDECREF(ctx->lastRetval);
     

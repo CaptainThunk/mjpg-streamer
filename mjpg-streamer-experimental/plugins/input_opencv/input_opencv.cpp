@@ -48,7 +48,7 @@ typedef struct {
 // filter functions
 typedef bool (*filter_init_fn)(const char * args, void** filter_ctx);
 typedef Mat (*filter_init_frame_fn)(void* filter_ctx);
-typedef void (*filter_process_fn)(void* filter_ctx, Mat &src, Mat &dst);
+typedef void (*filter_process_fn)(void* filter_ctx, Mat &src, Mat &dst, int isRecording);
 typedef void (*filter_free_fn)(void* filter_ctx);
 
 
@@ -75,7 +75,7 @@ void worker_cleanup(void *);
 #define INPUT_PLUGIN_NAME "OpenCV Input plugin"
 static char plugin_name[] = INPUT_PLUGIN_NAME;
 
-static void null_filter(void* filter_ctx, Mat &src, Mat &dst) {
+static void null_filter(void* filter_ctx, Mat &src, Mat &dst, int isRecording) {
     dst = src;
 }
 
@@ -152,6 +152,8 @@ int input_init(input_parameter *param, int plugin_no)
     in->context = pctx;
 
     param->argv[0] = plugin_name;
+
+    pglobal->isRecording = 0; 
 
     /* show all parameters for DBG purposes */
     for(i = 0; i < param->argc; i++) {
@@ -389,7 +391,7 @@ void *worker_thread(void *arg)
     input * in = (input*)arg;
     context *pctx = (context*)in->context;
     context_settings *settings = (context_settings*)pctx->init_settings;
-    
+
     /* set cleanup handler to cleanup allocated resources */
     pthread_cleanup_push(worker_cleanup, arg);
 
@@ -431,11 +433,12 @@ void *worker_thread(void *arg)
         src = pctx->filter_init_frame(pctx->filter_ctx);
     
     while (!pglobal->stop) {
+        //IPRINT("\n[INFO] Value of pglobal.isRecording: %i\n\n", pglobal->isRecording);
         if (!pctx->capture.read(src))
             break; // TODO
             
         // call the filter function
-        pctx->filter_process(pctx->filter_ctx, src, dst);
+        pctx->filter_process(pctx->filter_ctx, src, dst, pglobal->isRecording);
             
         /* copy JPG picture to global buffer */
         pthread_mutex_lock(&in->db);
