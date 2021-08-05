@@ -477,13 +477,33 @@ void send_stream(cfd *context_fd, int input_number)
     struct timeval timestamp;
 
     DBG("preparing header\n");
+    // sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+    //         "X-Content-Type-Options: nosniff\r\n" \
+    //         "Access-Control-Allow-Origin: *\r\n" \
+    //         "Access-Control-Allow-Methods: GET\r\n" \
+    //         "Access-Control-Allow-Headers: Content-Type\r\n" \
+    //         STD_HEADER \
+    //         "Content-Type: multipart/x-mixed-replace;boundary=" BOUNDARY "\r\n" \
+    //         "\r\n" \
+    //         "--" BOUNDARY "\r\n");
+
     sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+            "X-Content-Type-Options: nosniff\r\n" \
             "Access-Control-Allow-Origin: *\r\n" \
+            "Access-Control-Allow_Credentials: true\r\n" \
+            "Access-Control-Allow-Headers: Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range\r\n" \
+            "Access-Control-Allow-Methods: GET,POST,OPTIONS,PUT,DELETE,PATCH\r\n" \
             STD_HEADER \
             "Content-Type: multipart/x-mixed-replace;boundary=" BOUNDARY "\r\n" \
             "\r\n" \
             "--" BOUNDARY "\r\n");
 
+    // sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+    //         "X-Content-Type-Options: nosniff\r\n" \
+    //         "Access-Control-Allow-Origin: *\r\n" \
+    //         STD_HEADER \
+    //         "Content-Type: application/octet-stream\r\n" \
+    //         "\r\n");
     if(write(context_fd->fd, buffer, strlen(buffer)) < 0) {
         free(frame);
         return;
@@ -1183,10 +1203,10 @@ void *client_thread(void *arg)
         query_suffixed = 255;
         #ifdef MANAGMENT
         if (check_client_status(lcfd.client)) {
-            req.type = A_UNKNOWN;
-            lcfd.client->last_take_time.tv_sec += piggy_fine;
-            send_error(lcfd.fd, 403, "frame already sent");
-            query_suffixed = 0;
+            // req.type = A_UNKNOWN;
+            // lcfd.client->last_take_time.tv_sec += piggy_fine;
+            // send_error(lcfd.fd, 403, "frame already sent");
+            // query_suffixed = 0;
         }
         #endif
     #ifdef WXP_COMPAT
@@ -1501,6 +1521,11 @@ void *client_thread(void *arg)
             // #endif
             
             sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                    "X-Content-Type-Options: nosniff\r\n" \
+                    "Access-Control-Allow-Origin: *\r\n" \
+                    "Access-Control-Allow_Credentials: true\r\n" \
+                    "Access-Control-Allow-Headers: Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range\r\n" \
+                    "Access-Control-Allow-Methods: GET,POST,OPTIONS,PUT,DELETE,PATCH\r\n" \
                     "Content-type: application/json\r\n" \
                     STD_HEADER \
                     "\r\n" \
@@ -1518,12 +1543,22 @@ void *client_thread(void *arg)
                 // if(recordingIPAddress != NULL && strstr(recordingIPAddress, lcfd.client->address) != NULL) {
                 if(recordingIPAddress != NULL && strcmp(lcfd.client->address, recordingIPAddress) != 0) {
                     sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                            "X-Content-Type-Options: nosniff\r\n" \
+                            "Access-Control-Allow-Origin: *\r\n" \
+                            "Access-Control-Allow_Credentials: true\r\n" \
+                            "Access-Control-Allow-Headers: Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range\r\n" \
+                            "Access-Control-Allow-Methods: GET,POST,OPTIONS,PUT,DELETE,PATCH\r\n" \
                             "Content-type: application/json\r\n" \
                             STD_HEADER \
                             "\r\n" \
                             "{\"message\": \"Recording is controlled by another IP\", \"ip\": \"%s\", \"ip\": \"%s\"}", recordingIPAddress, lcfd.client->address);
                 } else {
                     sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                            "X-Content-Type-Options: nosniff\r\n" \
+                            "Access-Control-Allow-Origin: *\r\n" \
+                            "Access-Control-Allow_Credentials: true\r\n" \
+                            "Access-Control-Allow-Headers: Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range\r\n" \
+                            "Access-Control-Allow-Methods: GET,POST,OPTIONS,PUT,DELETE,PATCH\r\n" \
                             "Content-type: application/json\r\n" \
                             STD_HEADER  \
                             "\r\n" \
@@ -1531,6 +1566,11 @@ void *client_thread(void *arg)
                 }
             #else
                 sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                        "X-Content-Type-Options: nosniff\r\n" \
+                        "Access-Control-Allow-Origin: *\r\n" \
+                        "Access-Control-Allow_Credentials: true\r\n" \
+                        "Access-Control-Allow-Headers: Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range\r\n" \
+                        "Access-Control-Allow-Methods: GET,POST,OPTIONS,PUT,DELETE,PATCH\r\n" \
                         "Content-type: application/json\r\n" \
                         STD_HEADER \
                         "\r\n" \
