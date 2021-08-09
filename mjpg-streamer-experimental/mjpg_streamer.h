@@ -93,6 +93,12 @@ struct _globals {
     int isRecording;
     //int pth_pan;
     //int pth_tilt;
+    // int cap_fps;
+    // int cap_brightness;
+    // int cap_contrast;
+    // int cap_saturation;
+    // int cap_gain;
+    // int cap_exposure;
 };
 
 #endif

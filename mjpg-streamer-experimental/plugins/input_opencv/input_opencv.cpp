@@ -282,10 +282,10 @@ int input_init(input_parameter *param, int plugin_no)
     //cap.set(cv2.CAP_PROP_GAMMA, 4000)
     //cap.set(cv2.CAP_PROP_AUTO_WB, 0)
 
-    IPRINT("Attempting to turn off auto exposure and whitebackground\n");
-    pctx->capture.set(CAP_PROP_AUTO_EXPOSURE, 0);
-    pctx->capture.set(CAP_PROP_AUTO_WB, 0);
-    pctx->capture.set(CAP_PROP_GAIN, 0);
+    // IPRINT("Attempting to turn off auto exposure and whitebackground\n");
+    // pctx->capture.set(CAP_PROP_AUTO_EXPOSURE, 0);
+    // pctx->capture.set(CAP_PROP_AUTO_WB, 0);
+    // pctx->capture.set(CAP_PROP_GAIN, 0);
 
     if (settings->fps_set)
         pctx->capture.set(CAP_PROP_FPS, settings->fps);
@@ -436,7 +436,23 @@ void *worker_thread(void *arg)
         //IPRINT("\n[INFO] Value of pglobal.isRecording: %i\n\n", pglobal->isRecording);
         if (!pctx->capture.read(src))
             break; // TODO
-            
+        
+        // get capture properties
+        // int cap_fps = pctx->capture.get(CAP_PROP_FPS);
+        // int cap_brightness = pctx->capture.get(CAP_PROP_BRIGHTNESS);
+        // int cap_contrast = pctx->capture.get(CAP_PROP_CONTRAST);
+        // int cap_saturation = pctx->capture.get(CAP_PROP_SATURATION);
+        // int cap_gain = pctx->capture.get(CAP_PROP_GAIN);            // doesn't work with Pi IR Cam
+        // int cap_exposure = pctx->capture.get(CAP_PROP_EXPOSURE);    // doesn't work with Pi IR Cam
+    
+    // pctx->capture.set(CAP_PROP_BRIGHTNESS, 80);
+        // IPRINT("fps: %d\n", cap_fps);
+        // IPRINT("brightness: %d\n", cap_brightness);
+        // IPRINT("contrast: %d\n", cap_contrast);
+        // IPRINT("saturation: %d\n", cap_saturation);
+        // IPRINT("gain: %d\n", cap_gain);
+        // IPRINT("exposure: %d\n", cap_exposure);
+
         // call the filter function
         pctx->filter_process(pctx->filter_ctx, src, dst, pglobal->isRecording);
             

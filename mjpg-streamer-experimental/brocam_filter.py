@@ -24,7 +24,7 @@ class MyFilter:
     debugModeWriteImage = False
 
     #frame_count = 0
-    consecutive_frame = 2       # this provides better resolution of a moving object, but the higher the value the more of the moving objects "ghost" it will catch, a larger area covering where it once
+    consecutive_frame = 1       # this provides better resolution of a moving object, but the higher the value the more of the moving objects "ghost" it will catch, a larger area covering where it once
    # background_image_count = 0
     setup_initialised = False   # determine if ready to start processing or build up initialisation data
     background_initialised = False # determine if background is available (finsihed in thread)
@@ -47,6 +47,8 @@ class MyFilter:
     recordData = True       # records with all added information, False it will be just the raw image
     videoFPS = 5
 
+    upTime = datetime.datetime.now().timestamp()
+
     def process(self, img, isRecording):
         '''
             :param img: A numpy array representing the input image
@@ -56,7 +58,10 @@ class MyFilter:
         # Constants
         motionThreshold = 500
 
-        if(pantilthat.get_pan() != self.pthPan or pantilthat.get_tilt() != self.pthTilt):
+        pthX = pantilthat.get_pan()
+        pthY = pantilthat.get_tilt()
+
+        if(pantilthat.get_pan() != self.pthPan or pthY != self.pthTilt):
             self.setup_initialised = False
             self.background_initialised = False
             self.rebuild_background = False
@@ -65,8 +70,8 @@ class MyFilter:
             #self.frame_count = 0
             #self.background_image_count = 0
 
-        self.pthPan = pantilthat.get_pan()
-        self.pthTilt = pantilthat.get_tilt()
+        self.pthPan = pthX
+        self.pthTilt = pthY
         #print("Pan: "+str(self.pthPan))
         #print("Tilt: "+str(self.pthTilt))
 #        ori_image = img.copy()
@@ -92,7 +97,6 @@ class MyFilter:
         if(not self.recordMode and isRecording == 1):
             self.recordMode = True
 
-            timeText = self.o_datetime.strftime("%X")
             self.videoOutput = cv2.VideoWriter(
                 self.pathOut+'carcam_'+str(self.o_datetime.strftime("%d-%m-%Y"))+'_'+str(self.o_datetime.strftime("%H-%M-%S"))+'.mp4',
                 cv2.VideoWriter_fourcc(*'mp4v'), self.videoFPS,
@@ -146,18 +150,21 @@ class MyFilter:
          
                 # find the difference between current frame and base frame
                 frame_diff = cv2.absdiff(gray, self.background)
+
                 # thresholding to convert the frame to binary
 #                ret, thres = cv2.threshold(frame_diff, 50, 255, cv2.THRESH_BINARY)
-                ret, thres = cv2.threshold(frame_diff, 40, 255, cv2.THRESH_BINARY)
+                ret, thres = cv2.threshold(frame_diff, 50, 255, cv2.THRESH_BINARY)
                 # dilate the frame a bit to get some more white area...
                 # ... makes the detection of contours a bit easier
-                dilate_frame = cv2.dilate(thres, None, iterations=1)
-                # append the final result into the `frame_diff_list`
+                dilate_frame = cv2.dilate(thres, None, iterations=2)
                 #if(len(self.frame_diff_list) > 0 and len(self.frame_diff_list) <= self.consecutive_frame):
+
+                # delete first frame if we have enough consecutive frames
                 if(len(self.frame_diff_list) >= self.consecutive_frame):
                     del self.frame_diff_list[0]
                     #self.frame_diff_list.pop(0)    # pop causes memoryleak
 
+                # append the final result into the `frame_diff_list`
                 self.frame_diff_list.append(dilate_frame)
 
                 #if(self.debugMode):
@@ -172,23 +179,96 @@ class MyFilter:
                 ret, contours, hierarchy = cv2.findContours(sum_frames, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
                 # draw the contours, not strictly necessary
-               # if(self.debugMode):
-                   # for i, cnt in enumerate(contours):
-                    #    cv2.drawContours(img, contours, i, (0, 0, 255), 3)
+                if(self.debugMode):
+                    for i, cnt in enumerate(contours):
+                        cv2.drawContours(img, contours, i, (255, 0, 0), 3)
+
+#                for contour in contours:
+#                #for contour in contourList:
+#                    # continue through the loop if contour area is less than 500...
+#                    # ... helps in removing noise detection
+#                    if cv2.contourArea(contour) < motionThreshold:
+#                        continue
+#                    # get the xmin, ymin, width, and height coordinates from the contours
+#                    (x, y, w, h) = cv2.boundingRect(contour)
+#                    # draw the bounding boxes
+#                    cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+#                    valid_cntrs = valid_cntrs + 1
+#        #            cv2.imshow('Detected Objects', orig_frame)
+
+#
 
 
-                for contour in contours:
-                    # continue through the loop if contour area is less than 500...
-                    # ... helps in removing noise detection
+                # go through contours and find boxes that overlap
+                contourList = []
+                excludeList = []
+
+                for i, contour in enumerate(contours):
                     if cv2.contourArea(contour) < motionThreshold:
                         continue
-                    # get the xmin, ymin, width, and height coordinates from the contours
-                    (x, y, w, h) = cv2.boundingRect(contour)
-                    # draw the bounding boxes
-                    cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                    valid_cntrs = valid_cntrs + 1
-        #            cv2.imshow('Detected Objects', orig_frame)
-                
+
+                    if i not in excludeList:
+                        (x, y, w, h) = cv2.boundingRect(contour)
+
+                        for i2, contour_2 in enumerate(contours):
+                            if(i == i2):    # skip self
+                                continue
+
+                            if cv2.contourArea(contour_2) < motionThreshold:
+                                continue
+
+                            if i2 in excludeList:
+                            #    print("Skip Excluded")
+                                continue
+
+
+                            (x2, y2, w2, h2) = cv2.boundingRect(contour_2)
+
+                            # test if overlap
+                            if( 
+                                ((x2 >= x and y2 >= y) and (x2 <= x+w and y2 <= y+h)) or
+                                ((x2+w2 >= x and y2+h2 >= y ) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
+                                ((x2 >= x and y2 >= y) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
+                                ((x2+w2 >= x and y2+h2 >= y ) and (x2 <= x+w and y2 <= y+h)) 
+                            ):
+                                #print("Overlap - X:"+str(x)+", y:"+str(y)+", w:"+str(w)+", h:"+str(h)+" -- x2:"+str(x2)+", y2:"+str(y2)+", w2:"+str(w2)+", h2:"+str(h2))
+
+                                #overlaps so set countour and countour_2 to exclude - no longer want to check it as we now know its an overlapper
+                                if i not in excludeList:
+                                    excludeList.append(i)
+                                if i2 not in excludeList:
+                                    excludeList.append(i2)
+
+                                newX = x
+                                newY = y
+                                newW = x+w
+                                newH = y+h
+
+                                if(x2 < x):
+                                    newX = x2
+                                if(y2 < y):
+                                    newY = y2
+                                if(x2+w2 > newW):
+                                    newW = x2+w2
+                                if(y2+h2 > newH):
+                                    newH = y2+h2
+
+                                # append to new countourlist with max value x,y,w,h
+                                #contourList.append([newX, newY, newX-newW, newY-newH])
+                                #np.append(contourList, [newX, newY, newX-newW, newY-newH], axis=0)
+
+                                cv2.rectangle(img, (newX, newY), (newW, newH), (0, 0, 255), 2)
+                                valid_cntrs = valid_cntrs + 1
+
+                    if i not in excludeList:
+                        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                        valid_cntrs = valid_cntrs + 1
+                     #   np.append(contourList, [x, y, w, h], axis=0)
+
+               
+
+
+
 
 
 
@@ -260,6 +340,7 @@ class MyFilter:
         timeText = self.o_datetime.strftime("%X")
         panText = "Cam Pan Angle: "+str(self.pthPan)
         tiltText = "Cam Tilt Angle: "+str(self.pthTilt) 
+        upTimeText = "Uptime: "+str(datetime.datetime.fromtimestamp(datetime.datetime.utcnow().timestamp() - self.upTime).strftime("%X"))
 
         # Info box - calculate longest string to determine positioning
         textsize_titletext = cv2.getTextSize(titleText, self.font, 1, 2)[0]
@@ -267,6 +348,7 @@ class MyFilter:
         textsize_timeText = cv2.getTextSize(timeText, self.font, fontscale, 1)[0]
         textsize_pantext = cv2.getTextSize(panText, self.font, fontscale, 1)[0]
         textsize_tilttext = cv2.getTextSize(tiltText, self.font, fontscale, 1)[0]
+        textsize_uptimetext = cv2.getTextSize(upTimeText, self.font, fontscale, 1)[0]
 
         # get coords based on boundary
         textX = textsize_dateText[0]
@@ -296,6 +378,13 @@ class MyFilter:
         if(textsize_tilttext[1] > textY):
             textY = textsize_tilttext[1]
 
+        # see if uptimetext is bigger
+        if(textsize_uptimetext[0] > textX):
+            textX = textsize_uptimetext[0]
+
+        if(textsize_uptimetext[1] > textY):
+            textY = textsize_uptimetext[1]
+
         posTextX = img_w - textX - margin
         posTextY = img_h - (textY * numTextLines) - margin     # set size of box based on biggest textY * number of text lines
 
@@ -305,6 +394,7 @@ class MyFilter:
         cv2.putText(img, timeText, (posTextX, posTextY + textY), self.font, fontscale, (0, 180, 0), 1)
         cv2.putText(img, panText, (posTextX, posTextY + (textY*2)), self.font, fontscale, (0, 180, 0), 1)
         cv2.putText(img, tiltText, (posTextX, posTextY + (textY*3)), self.font, fontscale, (0, 180, 0), 1)
+        cv2.putText(img, upTimeText, (posTextX, posTextY + (textY*4)), self.font, fontscale, (0, 180, 0), 1)
         # end Info box
 
         # Debug box
@@ -368,7 +458,7 @@ class MyFilter:
             cv2.putText(img, debugLastUpdText, (dbgPosTextX-textsize_debugLastUpdText[0], dbgPosTextY + (dbgTextY*3)), self.font, fontscale, (0, 180, 0), 1)
             cv2.putText(img, debugUpdateTime, (dbgPosTextX-textsize_debugUpdateTime[0], dbgPosTextY + (dbgTextY*4)), self.font, fontscale, (0, 180, 0), 1)
             cv2.putText(img, debugNextUpdate, (dbgPosTextX-textsize_debugNextUpdate[0], dbgPosTextY + (dbgTextY*5)), self.font, fontscale, (0, 180, 0), 1)
-            # end Debug box
+        # end Debug box
 
         # warn that system is currently initialising so not to expect anything
         if(self.setup_initialised == False or self.rebuild_background == True):
@@ -391,7 +481,7 @@ class MyFilter:
             self.last_background_update_ts = datetime.datetime.now().timestamp() # reset timer else it'll recall itself thinking its due before the function completed
 
         # update background if time is met
-        if(self.last_background_update_ts != 0 and (self.o_datetime.now().timestamp() - self.last_background_update_ts) > self.background_update_time and self.setup_initialised == True):
+        if(self.last_background_update_ts != 0 and (self.o_datetime.timestamp() - self.last_background_update_ts) > self.background_update_time and self.setup_initialised == True):
             self.rebuild_background = True
 
             initMsg = "Rebuilding Background for Object Motion Detection"

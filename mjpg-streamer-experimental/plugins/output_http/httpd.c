@@ -1551,7 +1551,7 @@ void *client_thread(void *arg)
                             "Content-type: application/json\r\n" \
                             STD_HEADER \
                             "\r\n" \
-                            "{\"message\": \"Recording is controlled by another IP\", \"ip\": \"%s\", \"ip\": \"%s\"}", recordingIPAddress, lcfd.client->address);
+                            "{\"message\": \"Recording is controlled by another IP\", \"changeRec\": false, \"recordingip\": \"%s\", \"clientip\": \"%s\", \"isRecording\": %d}", recordingIPAddress, lcfd.client->address, pglobal->isRecording);
                 } else {
                     sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
                             "X-Content-Type-Options: nosniff\r\n" \
@@ -1562,7 +1562,7 @@ void *client_thread(void *arg)
                             "Content-type: application/json\r\n" \
                             STD_HEADER  \
                             "\r\n" \
-                            "{\"message\": \"None\"}");
+                            "{\"isRecording\": %d, \"changeRec\": true}", pglobal->isRecording);
                 }
             #else
                 sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
@@ -1574,7 +1574,7 @@ void *client_thread(void *arg)
                         "Content-type: application/json\r\n" \
                         STD_HEADER \
                         "\r\n" \
-                        "{\"message\": \"None\"}");
+                        "{\"isRecording\": %d, \"changeRec\": true}", pglobal->isRecording);
             #endif
 
             if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {
