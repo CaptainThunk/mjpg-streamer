@@ -21,7 +21,7 @@ using namespace std;
 extern "C" {
     bool filter_init(const char * args, void** filter_ctx);
     Mat filter_init_frame(void* filter_ctx);
-    void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode);
+    void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode, int motionThresholdSlider, int contourThresholdSlider);
     void filter_free(void* filter_ctx);
 }
 
@@ -174,7 +174,7 @@ Mat filter_init_frame(void *filter_ctx) {
 /**
     Called by the OpenCV plugin upon each frame
 */
-void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode) {
+void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode, int motionThresholdSlider, int contourThresholdSlider) {
     
     Context *ctx = (Context*)filter_ctx;
     PyObject *ndArray, *pArgs;
@@ -182,7 +182,9 @@ void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int d
     PyObject *debugCamModeState;
     PyObject *debugContourModeState;
     PyObject *motionDetectModeState;
-    
+    PyObject *motionThresholdState;
+    PyObject *contourThresholdState;
+
     PyGILState_STATE gil_state = PyGILState_Ensure();
 
     //fprintf(stderr, "isRecording \"%i\"\n", isRecording);
@@ -190,6 +192,8 @@ void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int d
     debugCamModeState = Py_BuildValue("i",debugCamMode);
     debugContourModeState = Py_BuildValue("i",debugContourMode);
     motionDetectModeState = Py_BuildValue("i",motionDetectMode);
+    motionThresholdState = Py_BuildValue("i",motionThresholdSlider);
+    contourThresholdState = Py_BuildValue("i",contourThresholdSlider);
 
     ndArray = ctx->converter.toNDArray(src);
     if (ndArray == NULL) {
@@ -199,12 +203,15 @@ void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int d
         return;
     }
         
-    pArgs = PyTuple_New(5);
+    pArgs = PyTuple_New(7);
     PyTuple_SetItem(pArgs, 0, ndArray); // takes ownership of ndarray
     PyTuple_SetItem(pArgs, 1, recordingState);
     PyTuple_SetItem(pArgs, 2, debugCamModeState);
     PyTuple_SetItem(pArgs, 3, debugContourModeState);
     PyTuple_SetItem(pArgs, 4, motionDetectModeState);
+    PyTuple_SetItem(pArgs, 5, motionThresholdState);
+    PyTuple_SetItem(pArgs, 6, contourThresholdState);
+
     // see below for rationale
     Py_XDECREF(ctx->lastRetval);
     

@@ -48,7 +48,7 @@ typedef struct {
 // filter functions
 typedef bool (*filter_init_fn)(const char * args, void** filter_ctx);
 typedef Mat (*filter_init_frame_fn)(void* filter_ctx);
-typedef void (*filter_process_fn)(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode);
+typedef void (*filter_process_fn)(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode, int motionThresholdSlider, int contourThresholdSlider);
 typedef void (*filter_free_fn)(void* filter_ctx);
 
 
@@ -75,7 +75,7 @@ void worker_cleanup(void *);
 #define INPUT_PLUGIN_NAME "OpenCV Input plugin"
 static char plugin_name[] = INPUT_PLUGIN_NAME;
 
-static void null_filter(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode) {
+static void null_filter(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode, int motionThresholdSlider, int contourThresholdSlider) {
     dst = src;
 }
 
@@ -153,11 +153,14 @@ int input_init(input_parameter *param, int plugin_no)
 
     param->argv[0] = plugin_name;
 
+    /* default values */
     pglobal->isRecording = 0; 
     pglobal->debugCamMode = 0;
     pglobal->debugContourMode = 0;
     pglobal->motionDetectMode = 1;
-
+    pglobal->motionThresholdSlider = 50;
+    pglobal->contourThresholdSlider = 500;
+    
     /* show all parameters for DBG purposes */
     for(i = 0; i < param->argc; i++) {
         DBG("argv[%d]=%s\n", i, param->argv[i]);
@@ -457,7 +460,7 @@ void *worker_thread(void *arg)
         // IPRINT("exposure: %d\n", cap_exposure);
 
         // call the filter function
-        pctx->filter_process(pctx->filter_ctx, src, dst, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
+        pctx->filter_process(pctx->filter_ctx, src, dst, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
             
         /* copy JPG picture to global buffer */
         pthread_mutex_lock(&in->db);

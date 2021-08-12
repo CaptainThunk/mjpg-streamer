@@ -94,6 +94,8 @@ struct _globals {
     int debugCamMode;
     int debugContourMode;
     int motionDetectMode;
+    int motionThresholdSlider;
+    int contourThresholdSlider;
     
     //int pth_pan;
     //int pth_tilt;

@@ -899,7 +899,7 @@ Return Value: -
 ******************************************************************************/
 void settingCommand(int id, int fd, char *parameter) {
     char buffer[BUFFER_SIZE] = {0};
-    char *command = NULL, *svalue = NULL;
+    char *command = NULL, *svalue = NULL, *value = NULL;
     int ivalue = -1,  len = 0;
 
     // OPRINT("parameter is: %s\n", parameter);
@@ -943,7 +943,23 @@ void settingCommand(int id, int fd, char *parameter) {
         } else if(strcmp(svalue,"off") == 0) {
             ivalue = 0;
         } else {
-            ivalue = -1;
+            // try converting to a number (for the sliders)
+            // ivalue = -1;
+
+            len = strspn(svalue, "-1234567890");
+            if((value = strndup(svalue, len)) == NULL) {
+                if(command != NULL) free(command);
+                send_error(fd, 500, "could not allocate memory for string conversion to number");
+                LOG("could not allocate memory\n");
+                return;
+            }
+            ivalue = MAX(MIN(strtol(value, NULL, 10), INT_MAX), INT_MIN);
+            // OPRINT("Command is: %s\n", command);
+            // OPRINT("len is: %d\n", len);
+            // OPRINT("svalue is: %s\n", svalue);
+            // OPRINT("value is: %s\n", value);
+            // OPRINT("ivalue is: %d\n", ivalue);
+
         }
 
         if(ivalue > -1) {
@@ -953,6 +969,10 @@ void settingCommand(int id, int fd, char *parameter) {
                 pglobal->debugContourMode = ivalue;
             } else if(strcmp(command,"motionDetect") == 0) {
                 pglobal->motionDetectMode = ivalue;
+            } else if(strcmp(command,"motionThreshold") == 0) {
+                pglobal->motionThresholdSlider = ivalue;
+            } else if(strcmp(command,"contourThreshold") == 0) {
+                pglobal->contourThresholdSlider = ivalue;
             }
 
             sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
@@ -964,7 +984,8 @@ void settingCommand(int id, int fd, char *parameter) {
                         "Content-type: application/json\r\n" \
                         STD_HEADER \
                         "\r\n" \
-                        "{\"type\": \"%s\", \"value\": %d, \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", command, ivalue, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
+                        "{\"type\": \"%s\", \"value\": %d, \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
+                            command, ivalue, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
         } else {
             sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
                         "X-Content-Type-Options: nosniff\r\n" \
@@ -1662,7 +1683,8 @@ void *client_thread(void *arg)
                     "Content-type: application/json\r\n" \
                     STD_HEADER \
                     "\r\n" \
-                    "{\"pth_x\": %d,\"pth_y\": %d, \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
+                    "{\"pth_x\": %d,\"pth_y\": %d, \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
+                        pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
 
             if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {
                 DBG("write failed, done anyway\n");
@@ -1684,7 +1706,8 @@ void *client_thread(void *arg)
                             "Content-type: application/json\r\n" \
                             STD_HEADER \
                             "\r\n" \
-                            "{\"message\": \"Recording is controlled by another IP\", \"changeRec\": false, \"recordingip\": \"%s\", \"clientip\": \"%s\", \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
+                            "{\"message\": \"Recording is controlled by another IP\", \"changeRec\": false, \"recordingip\": \"%s\", \"clientip\": \"%s\", \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
+                                pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
                 } else {
                     sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
                             "X-Content-Type-Options: nosniff\r\n" \
@@ -1695,7 +1718,8 @@ void *client_thread(void *arg)
                             "Content-type: application/json\r\n" \
                             STD_HEADER  \
                             "\r\n" \
-                            "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
+                            "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
+                                pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
                 }
             #else
                 sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
@@ -1707,7 +1731,8 @@ void *client_thread(void *arg)
                         "Content-type: application/json\r\n" \
                         STD_HEADER \
                         "\r\n" \
-                        "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
+                        "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
+                            pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
             #endif
 
             if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {

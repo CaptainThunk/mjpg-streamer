@@ -59,7 +59,7 @@ class MyFilter:
 
     upTime = datetime.datetime.now().timestamp()
 
-    def process(self, img, isRecording, debugCamMode, debugContourMode, motionDetectMode):
+    def process(self, img, isRecording, debugCamMode, debugContourMode, motionDetectMode, motionThresholdSlider, contourThresholdSlider):
         '''
             :param img: A numpy array representing the input image
             :param isRecording: An Int sent from output_http indicating whether script should be recording or not
@@ -85,6 +85,9 @@ class MyFilter:
         else:
             self.motionDetect = False
 
+        self.frameThreshold = motionThresholdSlider
+        self.contourThreshold = contourThresholdSlider
+        
         pthX = pantilthat.get_pan()
         pthY = pantilthat.get_tilt()
 
