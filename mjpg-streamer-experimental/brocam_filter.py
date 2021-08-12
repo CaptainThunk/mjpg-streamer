@@ -3,6 +3,7 @@ import sys
 import cv2
 import numpy as np
 import datetime
+import time
 import threading
 import pantilthat
 from collections import Mapping, Container
@@ -21,6 +22,7 @@ class MyFilter:
     pathOut = "/home/pi/Videos/"
 
     debugMode = True
+    debugContours = False
     debugModeWriteImage = False
 
     #frame_count = 0
@@ -47,16 +49,41 @@ class MyFilter:
     recordData = True       # records with all added information, False it will be just the raw image
     videoFPS = 5
 
+    # measure fps
+    prev_frame_time = 0
+    new_frame_time = 0
+
+    # motion thresholds
+    frameThreshold = 50
+    contourThreshold = 500
+
     upTime = datetime.datetime.now().timestamp()
 
-    def process(self, img, isRecording):
+    def process(self, img, isRecording, debugCamMode, debugContourMode, motionDetectMode):
         '''
             :param img: A numpy array representing the input image
             :param isRecording: An Int sent from output_http indicating whether script should be recording or not
+            :param debugCamMode: Enable/Disable debug information
+            :param debugContourMode: Enable/Disable contour patterns, for debug purposes
+            :param motionDetect: Enable/Disable motion detecting (thereby debugCountourMode as well)
             :returns: A numpy array to send to the mjpg-streamer output plugin
         '''
-        # Constants
-        motionThreshold = 500
+
+        # set params sent from plugin
+        if(debugCamMode == 1):
+            self.debugMode = True
+        else:
+            self.debugMode = False
+
+        if(debugContourMode == 1):
+            self.debugContours = True
+        else:
+            self.debugContours = False
+
+        if(motionDetectMode == 1):
+            self.motionDetect = True
+        else:
+            self.motionDetect = False
 
         pthX = pantilthat.get_pan()
         pthY = pantilthat.get_tilt()
@@ -101,8 +128,12 @@ class MyFilter:
                 self.pathOut+'carcam_'+str(self.o_datetime.strftime("%d-%m-%Y"))+'_'+str(self.o_datetime.strftime("%H-%M-%S"))+'.mp4',
                 cv2.VideoWriter_fourcc(*'mp4v'), self.videoFPS,
                 (img_w, img_h)
+
             )
 
+            # write current frame buffer
+            for bckFrame in self.background_frames:
+                self.videoOutput.write(bckFrame)
     
         # turn recording off
         if(self.recordMode and isRecording == 0):
@@ -134,7 +165,7 @@ class MyFilter:
                 th.start()
                 
         else:
-            if(self.background_initialised):
+            if(self.background_initialised and self.motionDetect):
                 #self.frame_count = self.frame_count + 1
                 
                 # remove first frame from background_frames and then add img
@@ -153,7 +184,7 @@ class MyFilter:
 
                 # thresholding to convert the frame to binary
 #                ret, thres = cv2.threshold(frame_diff, 50, 255, cv2.THRESH_BINARY)
-                ret, thres = cv2.threshold(frame_diff, 50, 255, cv2.THRESH_BINARY)
+                ret, thres = cv2.threshold(frame_diff, self.frameThreshold, 255, cv2.THRESH_BINARY)
                 # dilate the frame a bit to get some more white area...
                 # ... makes the detection of contours a bit easier
                 dilate_frame = cv2.dilate(thres, None, iterations=2)
@@ -179,7 +210,7 @@ class MyFilter:
                 ret, contours, hierarchy = cv2.findContours(sum_frames, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
                 # draw the contours, not strictly necessary
-                if(self.debugMode):
+                if(self.debugContours):
                     for i, cnt in enumerate(contours):
                         cv2.drawContours(img, contours, i, (255, 0, 0), 3)
 
@@ -187,7 +218,7 @@ class MyFilter:
 #                #for contour in contourList:
 #                    # continue through the loop if contour area is less than 500...
 #                    # ... helps in removing noise detection
-#                    if cv2.contourArea(contour) < motionThreshold:
+#                    if cv2.contourArea(contour) < self.contourThreshold:
 #                        continue
 #                    # get the xmin, ymin, width, and height coordinates from the contours
 #                    (x, y, w, h) = cv2.boundingRect(contour)
@@ -204,7 +235,7 @@ class MyFilter:
                 excludeList = []
 
                 for i, contour in enumerate(contours):
-                    if cv2.contourArea(contour) < motionThreshold:
+                    if cv2.contourArea(contour) < self.contourThreshold:
                         continue
 
                     if i not in excludeList:
@@ -214,7 +245,7 @@ class MyFilter:
                             if(i == i2):    # skip self
                                 continue
 
-                            if cv2.contourArea(contour_2) < motionThreshold:
+                            if cv2.contourArea(contour_2) < self.contourThreshold:
                                 continue
 
                             if i2 in excludeList:
@@ -297,7 +328,7 @@ class MyFilter:
                 
 #                for cntr in contours:
 #                    x,y,w,h = cv2.boundingRect(cntr)
-#                    if (cv2.contourArea(cntr) >= motionThreshold):
+#                    if (cv2.contourArea(cntr) >= self.contourThreshold):
                         #if (cv2.contourArea(cntr) < 40):
                         #    break
 #                        valid_cntrs.append(cntr)
@@ -315,7 +346,7 @@ class MyFilter:
         ### Image processing to img - do at end to preserve image for next frame
 
         # Show detected number of motions
-        if(self.setup_initialised and self.background_initialised):
+        if(self.setup_initialised and self.background_initialised and self.debugMode and self.motionDetect):
             cv2.putText(img, "motions detected: " + str(valid_cntrs), (55, 15), self.font, 0.6, (0, 180, 0), 2)
 
         if(self.is_background_building):
@@ -333,6 +364,13 @@ class MyFilter:
         margin = 20
         numTextLines = 7 # doesn't include Title
         fontscale = 0.6
+
+        # do time calc as late as possible
+        # time when we finish processing for this frame
+        self.new_frame_time = time.time()
+        fps = 1/(self.new_frame_time-self.prev_frame_time)
+        self.prev_frame_time = self.new_frame_time
+        self.videoFPS = fps
 
         # Info box - text strings
         titleText = "BroNet Car Cam"
@@ -395,6 +433,7 @@ class MyFilter:
         cv2.putText(img, panText, (posTextX, posTextY + (textY*2)), self.font, fontscale, (0, 180, 0), 1)
         cv2.putText(img, tiltText, (posTextX, posTextY + (textY*3)), self.font, fontscale, (0, 180, 0), 1)
         cv2.putText(img, upTimeText, (posTextX, posTextY + (textY*4)), self.font, fontscale, (0, 180, 0), 1)
+        cv2.putText(img, "FPS: "+str(int(fps)), (posTextX, posTextY + (textY*5)), self.font, fontscale, (0, 180, 0), 1)
         # end Info box
 
         # Debug box
@@ -512,7 +551,8 @@ class MyFilter:
         # print(frame_indices)
         # store the frames in array
         # print("Calculating background frame using random sample of "+str(num_sample_frames)+" frames from "+str(self.background_frame_count_span)+" images")
-        print("Calculating background frame using random sample of "+str(num_sample_frames)+" frames from "+str(len(self.background_frames))+" images")
+        if(self.debugMode):
+            print("Calculating background frame using random sample of "+str(num_sample_frames)+" frames from "+str(len(self.background_frames))+" images")
 
         frames = []
         for idx in frame_indices:
@@ -528,8 +568,9 @@ class MyFilter:
             cv2.imwrite(self.pathIn+'background_median_debug_'+str(ts1)+'.png', self.background) # debug save
         
         ts2 = datetime.datetime.now().timestamp()
-        print("Initialisation of background complete")
-        print("Time Taken: "+str(ts2 - ts1))
+        if(self.debugMode):
+            print("Initialisation of background complete")
+            print("Time Taken: "+str(ts2 - ts1))
 
         self.last_background_update_ts = ts2
         

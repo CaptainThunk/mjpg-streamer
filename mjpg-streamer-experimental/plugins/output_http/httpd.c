@@ -339,6 +339,7 @@ client_info *add_client(char *address)
             return client_infos.infos[i];
         }
     }
+OPRINT("Connecting Client: %s\n", address);
 
     client_info *current_client_info = malloc(sizeof(client_info));
     if (current_client_info == NULL) {
@@ -896,6 +897,103 @@ Input Value.: * fd.......: filedescriptor to send HTTP response to.
               * id.......: specifies which server-context to choose.
 Return Value: -
 ******************************************************************************/
+void settingCommand(int id, int fd, char *parameter) {
+    char buffer[BUFFER_SIZE] = {0};
+    char *command = NULL, *svalue = NULL;
+    int ivalue = -1,  len = 0;
+
+    // OPRINT("parameter is: %s\n", parameter);
+
+    /* sanity check of parameter-string */
+    if(parameter == NULL || strlen(parameter) >= 255 || strlen(parameter) == 0) {
+        DBG("parameter string looks bad\n");
+        send_error(fd, 400, "Setting-string of command does not look valid.");
+        return;
+    }
+
+    // get the command name
+    if((command = strstr(parameter, "&")) == NULL) {
+        DBG("no command id specified\n");
+        send_error(fd, 400, "Unable to find parameters for the setting");
+        return;
+    }
+
+    // get the command
+    command += strlen("&");
+    len = strspn(command, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_1234567890");
+    if((command = strndup(command, len)) == NULL) {
+        send_error(fd, 500, "could not allocate memory");
+        LOG("could not allocate memory\n");
+        return;
+    }
+
+    // get the value
+    if((svalue = strstr(parameter, "=")) != NULL) {
+        svalue += strlen("=");
+        len = strspn(svalue, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-1234567890");
+        if((svalue = strndup(svalue, len)) == NULL) {
+            if(command != NULL) free(command);
+            send_error(fd, 500, "could not allocate memory");
+            LOG("could not allocate memory\n");
+            return;
+        }
+
+        if(strcmp(svalue,"on") == 0) {
+            ivalue = 1;
+        } else if(strcmp(svalue,"off") == 0) {
+            ivalue = 0;
+        } else {
+            ivalue = -1;
+        }
+
+        if(ivalue > -1) {
+            if(strcmp(command,"debug") == 0) {
+                pglobal->debugCamMode = ivalue;
+            } else if(strcmp(command,"debugContours") == 0) {
+                pglobal->debugContourMode = ivalue;
+            } else if(strcmp(command,"motionDetect") == 0) {
+                pglobal->motionDetectMode = ivalue;
+            }
+
+            sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                        "X-Content-Type-Options: nosniff\r\n" \
+                        "Access-Control-Allow-Origin: *\r\n" \
+                        "Access-Control-Allow_Credentials: true\r\n" \
+                        "Access-Control-Allow-Headers: Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range\r\n" \
+                        "Access-Control-Allow-Methods: GET,POST,OPTIONS,PUT,DELETE,PATCH\r\n" \
+                        "Content-type: application/json\r\n" \
+                        STD_HEADER \
+                        "\r\n" \
+                        "{\"type\": \"%s\", \"value\": %d, \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", command, ivalue, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
+        } else {
+            sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
+                        "X-Content-Type-Options: nosniff\r\n" \
+                        "Access-Control-Allow-Origin: *\r\n" \
+                        "Access-Control-Allow_Credentials: true\r\n" \
+                        "Access-Control-Allow-Headers: Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range\r\n" \
+                        "Access-Control-Allow-Methods: GET,POST,OPTIONS,PUT,DELETE,PATCH\r\n" \
+                        "Content-type: application/json\r\n" \
+                        STD_HEADER \
+                        "\r\n" \
+                        "{\"type\": \"failed command\"}");
+        }
+        if(write(fd, buffer, strlen(buffer)) < 0) {
+            DBG("write failed, done anyway\n");
+        }
+    }
+    
+    // OPRINT("command is: %s\n", command);
+    // OPRINT("value is: %s\n", svalue);
+
+
+    // OPRINT("command is: %s\n", command);
+    // OPRINT("value is: %s\n", svalue);
+    // OPRINT("ivalue is: %d\n", ivalue);
+
+    if(command != NULL) free(command);
+    if(svalue != NULL) free(svalue);
+}
+
 void command(int id, int fd, char *parameter)
 {
     char buffer[BUFFER_SIZE] = {0};
@@ -1192,10 +1290,10 @@ void *client_thread(void *arg)
         query_suffixed = 255;
         #ifdef MANAGMENT
         if (check_client_status(lcfd.client)) {
-            req.type = A_UNKNOWN;
-            lcfd.client->last_take_time.tv_sec += piggy_fine;
-            send_error(lcfd.fd, 403, "frame already sent");
-            query_suffixed = 0;
+            // req.type = A_UNKNOWN;
+            // lcfd.client->last_take_time.tv_sec += piggy_fine;
+            // send_error(lcfd.fd, 403, "frame already sent");
+            // query_suffixed = 0;
         }
         #endif
     } else if(strstr(buffer, "GET /?action=stream") != NULL) {
@@ -1297,6 +1395,38 @@ void *client_thread(void *arg)
         }
 
         DBG("command parameter (len: %d): \"%s\"\n", len, req.parameter);
+    } else if(strstr(buffer, "GET /?action=setting") != NULL) {
+        int len;
+        req.type = A_SWITCH;
+
+        /* advance by the length of known string */
+        if((pb = strstr(buffer, "GET /?action=setting")) == NULL) {
+            DBG("HTTP request seems to be malformed\n");
+            send_error(lcfd.fd, 400, "Malformed HTTP request");
+            close(lcfd.fd);
+            return NULL;
+        }
+        pb += strlen("GET /?action=setting"); // a pb points to thestring after the first & after command
+
+        /* only accept certain characters */
+        len = MIN(MAX(strspn(pb, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-=&1234567890%./"), 0), 100);
+
+        req.parameter = malloc(len + 1);
+        if(req.parameter == NULL) {
+            exit(EXIT_FAILURE);
+        }
+        memset(req.parameter, 0, len + 1);
+        strncpy(req.parameter, pb, len);
+        if(unescape(req.parameter) == -1) {
+            free(req.parameter);
+            send_error(lcfd.fd, 500, "could not properly unescape command parameter string");
+            LOG("could not properly unescape command parameter string\n");
+            close(lcfd.fd);
+            return NULL;
+        }
+
+        DBG("command parameter (len: %d): \"%s\"\n", len, req.parameter);
+        // OPRINT("command parameter (len: %d): \"%s\"\n", len, req.parameter);
     } else {
         int len;
 
@@ -1438,6 +1568,9 @@ void *client_thread(void *arg)
             }
             command(lcfd.pc->id, lcfd.fd, req.parameter);
             break;
+        case A_SWITCH:
+            settingCommand(lcfd.pc->id, lcfd.fd, req.parameter);
+            break;
         case A_INPUT_JSON:
             DBG("Request for the Input plugin descriptor JSON file\n");
             send_input_JSON(lcfd.fd, input_number);
@@ -1529,7 +1662,7 @@ void *client_thread(void *arg)
                     "Content-type: application/json\r\n" \
                     STD_HEADER \
                     "\r\n" \
-                    "{\"pth_x\": %d,\"pth_y\": %d, \"isRecording\": %d}", pthx, pthy, pglobal->isRecording);
+                    "{\"pth_x\": %d,\"pth_y\": %d, \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
 
             if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {
                 DBG("write failed, done anyway\n");
@@ -1551,7 +1684,7 @@ void *client_thread(void *arg)
                             "Content-type: application/json\r\n" \
                             STD_HEADER \
                             "\r\n" \
-                            "{\"message\": \"Recording is controlled by another IP\", \"changeRec\": false, \"recordingip\": \"%s\", \"clientip\": \"%s\", \"isRecording\": %d}", recordingIPAddress, lcfd.client->address, pglobal->isRecording);
+                            "{\"message\": \"Recording is controlled by another IP\", \"changeRec\": false, \"recordingip\": \"%s\", \"clientip\": \"%s\", \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
                 } else {
                     sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
                             "X-Content-Type-Options: nosniff\r\n" \
@@ -1562,7 +1695,7 @@ void *client_thread(void *arg)
                             "Content-type: application/json\r\n" \
                             STD_HEADER  \
                             "\r\n" \
-                            "{\"isRecording\": %d, \"changeRec\": true}", pglobal->isRecording);
+                            "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
                 }
             #else
                 sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
@@ -1574,7 +1707,7 @@ void *client_thread(void *arg)
                         "Content-type: application/json\r\n" \
                         STD_HEADER \
                         "\r\n" \
-                        "{\"isRecording\": %d, \"changeRec\": true}", pglobal->isRecording);
+                        "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d}", pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode);
             #endif
 
             if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {

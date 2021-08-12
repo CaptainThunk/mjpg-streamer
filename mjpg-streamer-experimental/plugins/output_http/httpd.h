@@ -88,6 +88,7 @@ typedef enum {
     A_STREAM,
     A_STREAM_WXP,
     A_COMMAND,
+    A_SWITCH,
     A_FILE,
     A_CGI,
     A_PANTILT,

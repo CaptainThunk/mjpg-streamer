@@ -21,7 +21,7 @@ using namespace std;
 extern "C" {
     bool filter_init(const char * args, void** filter_ctx);
     Mat filter_init_frame(void* filter_ctx);
-    void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording);
+    void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode);
     void filter_free(void* filter_ctx);
 }
 
@@ -174,17 +174,23 @@ Mat filter_init_frame(void *filter_ctx) {
 /**
     Called by the OpenCV plugin upon each frame
 */
-void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording) {
+void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording, int debugCamMode, int debugContourMode, int motionDetectMode) {
     
     Context *ctx = (Context*)filter_ctx;
     PyObject *ndArray, *pArgs;
     PyObject *recordingState;
-
+    PyObject *debugCamModeState;
+    PyObject *debugContourModeState;
+    PyObject *motionDetectModeState;
+    
     PyGILState_STATE gil_state = PyGILState_Ensure();
 
     //fprintf(stderr, "isRecording \"%i\"\n", isRecording);
-    recordingState =Py_BuildValue("i",isRecording);
-    
+    recordingState = Py_BuildValue("i",isRecording);
+    debugCamModeState = Py_BuildValue("i",debugCamMode);
+    debugContourModeState = Py_BuildValue("i",debugContourMode);
+    motionDetectModeState = Py_BuildValue("i",motionDetectMode);
+
     ndArray = ctx->converter.toNDArray(src);
     if (ndArray == NULL) {
         PyErr_Print();
@@ -193,9 +199,12 @@ void filter_process(void* filter_ctx, Mat &src, Mat &dst, int isRecording) {
         return;
     }
         
-    pArgs = PyTuple_New(2);
+    pArgs = PyTuple_New(5);
     PyTuple_SetItem(pArgs, 0, ndArray); // takes ownership of ndarray
     PyTuple_SetItem(pArgs, 1, recordingState);
+    PyTuple_SetItem(pArgs, 2, debugCamModeState);
+    PyTuple_SetItem(pArgs, 3, debugContourModeState);
+    PyTuple_SetItem(pArgs, 4, motionDetectModeState);
     // see below for rationale
     Py_XDECREF(ctx->lastRetval);
     

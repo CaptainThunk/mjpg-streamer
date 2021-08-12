@@ -91,6 +91,10 @@ struct _globals {
     /* pointer to control functions */
     //int (*control)(int command, char *details);
     int isRecording;
+    int debugCamMode;
+    int debugContourMode;
+    int motionDetectMode;
+    
     //int pth_pan;
     //int pth_tilt;
     // int cap_fps;
