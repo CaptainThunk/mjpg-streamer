@@ -212,11 +212,7 @@ class MyFilter:
                 #ret, contours, hierarchy = cv2.findContours(sum_frames, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 ret, contours, hierarchy = cv2.findContours(sum_frames, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-                # draw the contours, not strictly necessary
-                if(self.debugContours):
-                    for i, cnt in enumerate(contours):
-                        cv2.drawContours(img, contours, i, (255, 0, 0), 3)
-
+# OLD OLD Method
 #                for contour in contours:
 #                #for contour in contourList:
 #                    # continue through the loop if contour area is less than 500...
@@ -232,77 +228,183 @@ class MyFilter:
 
 #
 
+# OLD Method
 
+                # # draw the contours, not strictly necessary
+                # if(self.debugContours):
+                #     for i, cnt in enumerate(contours):
+                #         cv2.drawContours(img, contours, i, (255, 0, 0), 3)
+
+                # # go through contours and find boxes that overlap
+                # contourList = []
+                # excludeList = []
+
+                # for i, contour in enumerate(contours):
+                #     if cv2.contourArea(contour) < self.contourThreshold:
+                #         continue
+
+                #     if i not in excludeList:
+                #         (x, y, w, h) = cv2.boundingRect(contour)
+
+                #         for i2, contour_2 in enumerate(contours):
+                #             if(i == i2):    # skip self
+                #                 continue
+
+                #             if cv2.contourArea(contour_2) < self.contourThreshold:
+                #                 continue
+
+                #             if i2 in excludeList:
+                #             #    print("Skip Excluded")
+                #                 continue
+
+
+                #             (x2, y2, w2, h2) = cv2.boundingRect(contour_2)
+
+                #             # test if overlap
+                #             if( 
+                #                 ((x2 >= x and y2 >= y) and (x2 <= x+w and y2 <= y+h)) or
+                #                 ((x2+w2 >= x and y2+h2 >= y ) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
+                #                 ((x2 >= x and y2 >= y) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
+                #                 ((x2+w2 >= x and y2+h2 >= y ) and (x2 <= x+w and y2 <= y+h)) 
+                #             ):
+                #                 #print("Overlap - X:"+str(x)+", y:"+str(y)+", w:"+str(w)+", h:"+str(h)+" -- x2:"+str(x2)+", y2:"+str(y2)+", w2:"+str(w2)+", h2:"+str(h2))
+
+                #                 #overlaps so set countour and countour_2 to exclude - no longer want to check it as we now know its an overlapper
+                #                 if i not in excludeList:
+                #                     excludeList.append(i)
+                #                 if i2 not in excludeList:
+                #                     excludeList.append(i2)
+
+                #                 newX = x
+                #                 newY = y
+                #                 newW = x+w
+                #                 newH = y+h
+
+                #                 if(x2 < x):
+                #                     newX = x2
+                #                 if(y2 < y):
+                #                     newY = y2
+                #                 if(x2+w2 > newW):
+                #                     newW = x2+w2
+                #                 if(y2+h2 > newH):
+                #                     newH = y2+h2
+
+                #                 # append to new countourlist with max value x,y,w,h
+                #                 #contourList.append([newX, newY, newX-newW, newY-newH])
+                #                 #np.append(contourList, [newX, newY, newX-newW, newY-newH], axis=0)
+
+                #                 cv2.rectangle(img, (newX, newY), (newW, newH), (0, 0, 255), 2)
+                #                 valid_cntrs = valid_cntrs + 1
+
+                #     if i not in excludeList:
+                #         cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                #         valid_cntrs = valid_cntrs + 1
+                #      #   np.append(contourList, [x, y, w, h], axis=0)
+
+
+# New method for motion detection bounding boxes. This merges all overlapping boxes.             
+                # draw the contours, not strictly necessary - move to after threshold check if want to show only ones acted upon (change the -1 to i though so it doesn't do all each iteration)
+                if(self.debugContours):
+                    cv2.drawContours(img, contours, -1, (255, 0, 0), 2)
+               
+                        
                 # go through contours and find boxes that overlap
                 contourList = []
-                excludeList = []
+                finalContourList = []
+                #excludeList = []
+                #contourDimensions = []
 
                 for i, contour in enumerate(contours):
                     if cv2.contourArea(contour) < self.contourThreshold:
                         continue
 
-                    if i not in excludeList:
-                        (x, y, w, h) = cv2.boundingRect(contour)
+                    contourList.append(cv2.boundingRect(contour));
 
-                        for i2, contour_2 in enumerate(contours):
-                            if(i == i2):    # skip self
-                                continue
+# TEMP DEBUG
+                # Red ordinary contours (debug purposes)
+                # for (x, y, w, h) in contourList:
+                #     cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
 
-                            if cv2.contourArea(contour_2) < self.contourThreshold:
-                                continue
+                # Interate the contourlist until there are no more overlaps using function
+                while True:
+                    finalContourList = findOverlappingContours(contourList)
+                    #if((contourList is None and finalContourList is None) or set(contourList) == set(finalContourList)):
+                    if(set(contourList) == set(finalContourList)):
+                        break
+                    contourList = finalContourList
 
-                            if i2 in excludeList:
-                            #    print("Skip Excluded")
-                                continue
+
+                # Green overlaps and overwrite nooverlaps
+                for (x, y, w, h) in finalContourList:
+                    cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                    valid_cntrs += 1
 
 
-                            (x2, y2, w2, h2) = cv2.boundingRect(contour_2)
-
-                            # test if overlap
-                            if( 
-                                ((x2 >= x and y2 >= y) and (x2 <= x+w and y2 <= y+h)) or
-                                ((x2+w2 >= x and y2+h2 >= y ) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
-                                ((x2 >= x and y2 >= y) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
-                                ((x2+w2 >= x and y2+h2 >= y ) and (x2 <= x+w and y2 <= y+h)) 
-                            ):
-                                #print("Overlap - X:"+str(x)+", y:"+str(y)+", w:"+str(w)+", h:"+str(h)+" -- x2:"+str(x2)+", y2:"+str(y2)+", w2:"+str(w2)+", h2:"+str(h2))
-
-                                #overlaps so set countour and countour_2 to exclude - no longer want to check it as we now know its an overlapper
-                                if i not in excludeList:
-                                    excludeList.append(i)
-                                if i2 not in excludeList:
-                                    excludeList.append(i2)
-
-                                newX = x
-                                newY = y
-                                newW = x+w
-                                newH = y+h
-
-                                if(x2 < x):
-                                    newX = x2
-                                if(y2 < y):
-                                    newY = y2
-                                if(x2+w2 > newW):
-                                    newW = x2+w2
-                                if(y2+h2 > newH):
-                                    newH = y2+h2
-
-                                # append to new countourlist with max value x,y,w,h
-                                #contourList.append([newX, newY, newX-newW, newY-newH])
-                                #np.append(contourList, [newX, newY, newX-newW, newY-newH], axis=0)
-
-                                cv2.rectangle(img, (newX, newY), (newW, newH), (0, 0, 255), 2)
-                                valid_cntrs = valid_cntrs + 1
-
-                    if i not in excludeList:
-                        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                        valid_cntrs = valid_cntrs + 1
-                     #   np.append(contourList, [x, y, w, h], axis=0)
-
-               
+                    #print(str(i)+": x="+str(x)+", y="+str(y)+", w="+str(w)+", h="+str(y) )
+                    # for i2, (x2, y2, w2, h2) in enumerate(contourList):
+                    #     if(i == i2):    # skip self
+                    #         continue
 
 
 
+
+                    # if i not in excludeList:
+                    #     (x, y, w, h) = cv2.boundingRect(contour)
+
+                    #     for i2, contour_2 in enumerate(contours):
+                    #         if(i == i2):    # skip self
+                    #             continue
+
+                    #         if cv2.contourArea(contour_2) < self.contourThreshold:
+                    #             continue
+
+                    #         if i2 in excludeList:
+                    #         #    print("Skip Excluded")
+                    #             continue
+
+
+                    #         (x2, y2, w2, h2) = cv2.boundingRect(contour_2)
+
+                    #         # test if overlap
+                    #         if( 
+                    #             ((x2 >= x and y2 >= y) and (x2 <= x+w and y2 <= y+h)) or
+                    #             ((x2+w2 >= x and y2+h2 >= y ) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
+                    #             ((x2 >= x and y2 >= y) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
+                    #             ((x2+w2 >= x and y2+h2 >= y ) and (x2 <= x+w and y2 <= y+h)) 
+                    #         ):
+                    #             #print("Overlap - X:"+str(x)+", y:"+str(y)+", w:"+str(w)+", h:"+str(h)+" -- x2:"+str(x2)+", y2:"+str(y2)+", w2:"+str(w2)+", h2:"+str(h2))
+
+                    #             #overlaps so set countour and countour_2 to exclude - no longer want to check it as we now know its an overlapper
+                    #             if i not in excludeList:
+                    #                 excludeList.append(i)
+                    #             if i2 not in excludeList:
+                    #                 excludeList.append(i2)
+
+                    #             newX = x
+                    #             newY = y
+                    #             newW = x+w
+                    #             newH = y+h
+
+                    #             if(x2 < x):
+                    #                 newX = x2
+                    #             if(y2 < y):
+                    #                 newY = y2
+                    #             if(x2+w2 > newW):
+                    #                 newW = x2+w2
+                    #             if(y2+h2 > newH):
+                    #                 newH = y2+h2
+
+                    #             # append to new countourlist with max value x,y,w,h
+                    #             #contourList.append([newX, newY, newX-newW, newY-newH])
+                    #             #np.append(contourList, [newX, newY, newX-newW, newY-newH], axis=0)
+
+                    #             cv2.rectangle(img, (newX, newY), (newW, newH), (0, 0, 255), 2)
+                    #             valid_cntrs = valid_cntrs + 1
+
+                    # if i not in excludeList:
+                    #     cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                    #     valid_cntrs = valid_cntrs + 1
+                    #  #   
 
 
 
@@ -359,7 +461,7 @@ class MyFilter:
         #cv2.line(img, (int(img_w/4), img_h2), (int(3*(img_w/4)), img_h2), (0xff, 0, 0), thickness=3)
         #cv2.line(img, (img_w2, int(img_h/4)), (img_w2, int(3*(img_h/4))), (0xff, 0, 0), thickness=3)
         if(self.debugMode):
-            crosshair_size = 12
+            crosshair_size = 16
             cv2.line(img, (int(img_w2 - (img_w/crosshair_size)), img_h2), (int(img_w2 + (img_w/crosshair_size)), img_h2), (0xff, 0, 0), thickness=3)
             cv2.line(img, (img_w2, (int(img_h2 - (img_h/crosshair_size)))), (img_w2, int(img_h2 + (img_h/crosshair_size))), (0xff, 0, 0), thickness=3)
 
@@ -624,3 +726,67 @@ def deep_getsizeof(o, ids):
  
     return r 
 
+
+def findOverlappingContours(contours):
+    '''
+        This function is takes a list and finds overlaps and returns the new list 
+    '''
+    newContourList = []
+    excludeList = []
+
+    # iterate contours list
+    for i, (x, y, w, h) in enumerate(contours):
+        # debug output
+        #print(str(i)+": x="+str(x)+", y="+str(y)+", w="+str(w)+", h="+str(y) )
+
+        # if isn't excluded (eg, already been handled as an overlap)
+        if i not in excludeList:
+            for i2, (x2, y2, w2, h2) in enumerate(contours):
+                if(i == i2):    # skip self
+                    continue
+
+                # skip if already handled and added to excludeList
+                if i2 in excludeList:
+                    #    print("Skip Excluded")
+                    continue
+
+                # Check if boxes overlap
+                if( 
+                    ((x2 >= x and y2 >= y) and (x2 <= x+w and y2 <= y+h)) or
+                    ((x2+w2 >= x and y2+h2 >= y ) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
+                    ((x2 >= x and y2 >= y) and (x2+w2 <= x+w and y2+h2 <= y+h)) or
+                    ((x2+w2 >= x and y2+h2 >= y ) and (x2 <= x+w and y2 <= y+h)) 
+                ):
+
+                    # debug output
+                    #print("Overlap - X:"+str(x)+", y:"+str(y)+", w:"+str(w)+", h:"+str(h)+" -- x2:"+str(x2)+", y2:"+str(y2)+", w2:"+str(w2)+", h2:"+str(h2))
+        
+                    # overlaps so exclude both i and i2 - no longer want to check it as we now know its an overlapper and has been handled
+                    if i not in excludeList:
+                        excludeList.append(i)
+                    if i2 not in excludeList:
+                        excludeList.append(i2)
+
+                    # define new box using max values of both (probably could use MAX() MIN() type functions here)
+                    newX = x
+                    newY = y
+                    newW = x+w
+                    newH = y+h
+
+                    if(x2 < x):
+                        newX = x2
+                    if(y2 < y):
+                        newY = y2
+                    if(x2+w2 > newW):
+                        newW = x2+w2
+                    if(y2+h2 > newH):
+                        newH = y2+h2
+
+                    # append to new countourlist with max value x,y,w,h
+                    newContourList.append((newX, newY, newW-newX, newH-newY))
+
+        # if not in excludelist because it didn't overlap add to list as ordinary box
+        if i not in excludeList:
+            newContourList.append((x, y, w, h))
+
+    return newContourList
