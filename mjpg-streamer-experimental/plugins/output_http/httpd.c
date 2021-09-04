@@ -20,6 +20,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA    #
 #                                                                              #
 *******************************************************************************/
+
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -46,6 +47,7 @@
 
 #include "httpd.h"
 #include "pantilthat.h"
+#include "imu01c.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
 #define V4L2_CTRL_TYPE_STRING_SUPPORTED
@@ -1673,7 +1675,10 @@ void *client_thread(void *arg)
             // #ifdef MANAGMENT
             //     OPRINT("IP: %s\n", lcfd.client->address);
             // #endif
-            
+			
+             // update magnetometer sensor
+			imu01c.update(&imu01c);
+
             sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
                     "X-Content-Type-Options: nosniff\r\n" \
                     "Access-Control-Allow-Origin: *\r\n" \
@@ -1683,8 +1688,8 @@ void *client_thread(void *arg)
                     "Content-type: application/json\r\n" \
                     STD_HEADER \
                     "\r\n" \
-                    "{\"pth_x\": %d,\"pth_y\": %d, \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
-                        pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
+                    "{\"pth_x\": %d,\"pth_y\": %d, \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d, \"heading\": %.2f, \"tiltHeading\": %.2f, \"temperature\": %.2f}", 
+                        pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider, imu01c.headingDegrees, imu01c.tiltHeadingDegrees, imu01c.LSM303D_TemperatureDegrees);
 
             if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {
                 DBG("write failed, done anyway\n");
@@ -1706,8 +1711,8 @@ void *client_thread(void *arg)
                             "Content-type: application/json\r\n" \
                             STD_HEADER \
                             "\r\n" \
-                            "{\"message\": \"Recording is controlled by another IP\", \"changeRec\": false, \"recordingip\": \"%s\", \"clientip\": \"%s\", \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
-                                pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
+                            "{\"message\": \"Recording is controlled by another IP\", \"changeRec\": false, \"recordingip\": \"%s\", \"clientip\": \"%s\", \"isRecording\": %d, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d, \"heading\": %.2f, \"tiltHeading\": %.2f, \"temperature\": %.2f}", 
+                                pthx, pthy, pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider, imu01c.headingDegrees, imu01c.tiltHeadingDegrees, imu01c.LSM303D_TemperatureDegrees);
                 } else {
                     sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
                             "X-Content-Type-Options: nosniff\r\n" \
@@ -1718,8 +1723,8 @@ void *client_thread(void *arg)
                             "Content-type: application/json\r\n" \
                             STD_HEADER  \
                             "\r\n" \
-                            "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
-                                pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
+                            "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d, \"heading\": %.2f, \"tiltHeading\": %.2f, \"temperature\": %.2f}", 
+                                pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider, imu01c.headingDegrees, imu01c.tiltHeadingDegrees, imu01c.LSM303D_TemperatureDegrees);
                 }
             #else
                 sprintf(buffer, "HTTP/1.0 200 OK\r\n" \
@@ -1731,8 +1736,8 @@ void *client_thread(void *arg)
                         "Content-type: application/json\r\n" \
                         STD_HEADER \
                         "\r\n" \
-                        "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d}", 
-                            pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider);
+                        "{\"isRecording\": %d, \"changeRec\": true, \"debug\": %d, \"debugContours\": %d, \"motionDetect\": %d, \"motionThreshold\": %d, \"contourThreshold\": %d, \"heading\": %.2f, \"tiltHeading\": %.2f, \"temperature\": %.2f}", 
+                            pglobal->isRecording, pglobal->debugCamMode, pglobal->debugContourMode, pglobal->motionDetectMode, pglobal->motionThresholdSlider, pglobal->contourThresholdSlider, imu01c.headingDegrees, imu01c.tiltHeadingDegrees, imu01c.LSM303D_TemperatureDegrees);
             #endif
 
             if(write(lcfd.fd, buffer, strlen(buffer)) < 0) {

@@ -458,10 +458,8 @@ class MyFilter:
             cv2.putText(img, "Building background", (55, 36), self.font, 0.6, (0, 180, 0), 2)
 
         # crude crosshair
-        #cv2.line(img, (int(img_w/4), img_h2), (int(3*(img_w/4)), img_h2), (0xff, 0, 0), thickness=3)
-        #cv2.line(img, (img_w2, int(img_h/4)), (img_w2, int(3*(img_h/4))), (0xff, 0, 0), thickness=3)
         if(self.debugMode):
-            crosshair_size = 16
+            crosshair_size = 16 # bigger the number the smaller the cross hair
             cv2.line(img, (int(img_w2 - (img_w/crosshair_size)), img_h2), (int(img_w2 + (img_w/crosshair_size)), img_h2), (0xff, 0, 0), thickness=3)
             cv2.line(img, (img_w2, (int(img_h2 - (img_h/crosshair_size)))), (img_w2, int(img_h2 + (img_h/crosshair_size))), (0xff, 0, 0), thickness=3)
 

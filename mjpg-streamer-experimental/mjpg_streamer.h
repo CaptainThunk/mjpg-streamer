@@ -32,6 +32,7 @@
 #include <linux/types.h>          /* for videodev2.h */
 #include <linux/videodev2.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 #ifdef DEBUG
 #define DBG(...) fprintf(stderr, " DBG(%s, %s(), %d): ", __FILE__, __FUNCTION__, __LINE__); fprintf(stderr, __VA_ARGS__)
@@ -106,5 +107,41 @@ struct _globals {
     // int cap_gain;
     // int cap_exposure;
 };
+typedef struct imu01cClass imu01cClass;
 
+struct imu01cClass{
+    int i2c_lsm303d_addr, i2c_l3gd20h_addr, _length;
+    bool is_setup;
+    int _i2c_retries;
+    unsigned int _i2c_retry_time;
+    double accel_xyz[3];
+    int mag_xyz[3];
+    int gyro_xyz[3];
+    double heading;
+    double headingDegrees;
+    double tiltHeading;
+    double tiltHeadingDegrees;
+    int LSM303D_Temperature;
+    double LSM303D_TemperatureDegrees;
+    int L3GD20H_Temperature;
+    double L3GD20H_TemperatureDegrees;
+    
+    bool (*setup)(imu01cClass *self);
+    bool (*i2c_write_byte)(imu01cClass *self, int addr, int reg, unsigned char c);
+    bool (*i2c_read_byte)(imu01cClass *self, int addr, int reg, unsigned char * c);
+    bool (*check_int_range)(int value, int value_min, int value_max);
+    int (*lsleep)(long int ms);
+    int (*twos_comp)(int val, int bits);
+    void (*getLSM303DTemperature)(imu01cClass *self);
+    void (*getL3GD20HTemperature)(imu01cClass *self);
+    void (*getHeading)(imu01cClass *self);
+    void (*getTiltHeading)(imu01cClass *self);
+    void (*update)(imu01cClass *self);
+    void (*getMag)(imu01cClass *self);
+    void (*getAccel)(imu01cClass *self);
+    void (*getGyro)(imu01cClass *self);
+    bool (*isMagReady)(imu01cClass *self);
+};
+
+struct imu01cClass imu01c;
 #endif

@@ -19,6 +19,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA    #
 #                                                                              #
 *******************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -40,8 +41,9 @@
 #include "../../mjpg_streamer.h"
 #include "../../utils.h"
 #include "httpd.h"
-
 #include "pantilthat.h"
+#include "imu01c.c"
+
 
 #define OUTPUT_PLUGIN_NAME "HTTP output plugin"
 /*
@@ -209,7 +211,19 @@ int output_init(output_parameter *param, int id)
     // if (!pth->setup())
     if (!pantilthat_setup())
     {
-        OPRINT("[FATAL] Could not initialize Pan-Tilt HAT module. Aborting.\n");
+        OPRINT("[FATAL] Could not initialize Pan-Tilt HAT module.\n");
+    }
+
+    OPRINT("\n[INFO] checking the MinIMU-9 v3 sensor...\n\n");
+
+	// Now, define an instance of our struct
+    // struct imu01cClass imu01c;
+    imu01c.is_setup = false;
+    imu01c.setup = imu01c_setup;
+
+    if(!imu01c.setup(&imu01c))
+    {
+        OPRINT("[FATAL] Could not initialize MinIMU-9 v3 sensor.\n");
     }
 
     return 0;
