@@ -6,6 +6,7 @@ import datetime
 import time
 import threading
 import pantilthat
+import imu01c
 from collections import Mapping, Container
 
 class MyFilter:
@@ -183,34 +184,35 @@ class MyFilter:
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
          
                 # find the difference between current frame and base frame
-                frame_diff = cv2.absdiff(gray, self.background)
+                if(gray.size == self.background.size and self.background.size != 0):
+                    frame_diff = cv2.absdiff(gray, self.background)
 
-                # thresholding to convert the frame to binary
-#                ret, thres = cv2.threshold(frame_diff, 50, 255, cv2.THRESH_BINARY)
-                ret, thres = cv2.threshold(frame_diff, self.frameThreshold, 255, cv2.THRESH_BINARY)
-                # dilate the frame a bit to get some more white area...
-                # ... makes the detection of contours a bit easier
-                dilate_frame = cv2.dilate(thres, None, iterations=2)
-                #if(len(self.frame_diff_list) > 0 and len(self.frame_diff_list) <= self.consecutive_frame):
+                    # thresholding to convert the frame to binary
+    #                ret, thres = cv2.threshold(frame_diff, 50, 255, cv2.THRESH_BINARY)
+                    ret, thres = cv2.threshold(frame_diff, self.frameThreshold, 255, cv2.THRESH_BINARY)
+                    # dilate the frame a bit to get some more white area...
+                    # ... makes the detection of contours a bit easier
+                    dilate_frame = cv2.dilate(thres, None, iterations=1)
+                    #if(len(self.frame_diff_list) > 0 and len(self.frame_diff_list) <= self.consecutive_frame):
 
-                # delete first frame if we have enough consecutive frames
-                if(len(self.frame_diff_list) >= self.consecutive_frame):
-                    del self.frame_diff_list[0]
-                    #self.frame_diff_list.pop(0)    # pop causes memoryleak
+                    # delete first frame if we have enough consecutive frames
+                    if(len(self.frame_diff_list) >= self.consecutive_frame):
+                        del self.frame_diff_list[0]
+                        #self.frame_diff_list.pop(0)    # pop causes memoryleak
 
-                # append the final result into the `frame_diff_list`
-                self.frame_diff_list.append(dilate_frame)
+                    # append the final result into the `frame_diff_list`
+                    self.frame_diff_list.append(dilate_frame)
 
-                #if(self.debugMode):
-                #    print("Number of frame_diff_list: "+str(len(self.frame_diff_list)))
+                    #if(self.debugMode):
+                    #    print("Number of frame_diff_list: "+str(len(self.frame_diff_list)))
 
-                # if we have reached `consecutive_frame` number of frames
-               #if len(self.frame_diff_list) == self.consecutive_frame:
-                # add all the frames in the `frame_diff_list`
-                sum_frames = sum(self.frame_diff_list)
-                # find the contours around the white segmented areas
-                #ret, contours, hierarchy = cv2.findContours(sum_frames, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                ret, contours, hierarchy = cv2.findContours(sum_frames, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                    # if we have reached `consecutive_frame` number of frames
+                   #if len(self.frame_diff_list) == self.consecutive_frame:
+                    # add all the frames in the `frame_diff_list`
+                    sum_frames = sum(self.frame_diff_list)
+                    # find the contours around the white segmented areas
+                    #ret, contours, hierarchy = cv2.findContours(sum_frames, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    ret, contours, hierarchy = cv2.findContours(sum_frames, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
 # OLD OLD Method
 #                for contour in contours:
@@ -482,6 +484,15 @@ class MyFilter:
         panText = "Cam Pan Angle: "+str(self.pthPan)
         tiltText = "Cam Tilt Angle: "+str(self.pthTilt) 
         upTimeText = "Uptime: "+str(datetime.datetime.fromtimestamp(datetime.datetime.utcnow().timestamp() - self.upTime).strftime("%X"))
+        # temperatureText = imu01c.getL3GD20HTemp()   # these are the 2 sensors for temperature on the imu01c - choose one
+        temperatureText = imu01c.getLSM303DTemp()+12   # these are the 2 sensors for temperature on the imu01c - choose one
+
+        # temperatureText = "{0:6.2f}".format(temperatureText)+"&#8451;C"
+        # temperatureText = "{0:6.2f}".format(temperatureText)+"°C"
+        temperatureText = "{0:6.2f}".format(temperatureText)+"C"
+
+        # set dateText to new value of time date temp
+        dateText = timeText+" "+dateText+" "+temperatureText
 
         # Info box - calculate longest string to determine positioning
         textsize_titletext = cv2.getTextSize(titleText, self.font, 1, 2)[0]
@@ -532,11 +543,11 @@ class MyFilter:
         # Info box - write text to image
         cv2.putText(img, titleText, (posTextX, posTextY - textsize_titletext[1]), self.font, 1, (93, 93, 216), 2)
         cv2.putText(img, dateText, (posTextX, posTextY), self.font, fontscale, (0, 180, 0), 1)
-        cv2.putText(img, timeText, (posTextX, posTextY + textY), self.font, fontscale, (0, 180, 0), 1)
-        cv2.putText(img, panText, (posTextX, posTextY + (textY*2)), self.font, fontscale, (0, 180, 0), 1)
-        cv2.putText(img, tiltText, (posTextX, posTextY + (textY*3)), self.font, fontscale, (0, 180, 0), 1)
-        cv2.putText(img, upTimeText, (posTextX, posTextY + (textY*4)), self.font, fontscale, (0, 180, 0), 1)
-        cv2.putText(img, "FPS: "+str(int(fps)), (posTextX, posTextY + (textY*5)), self.font, fontscale, (0, 180, 0), 1)
+        # cv2.putText(img, timeText, (posTextX, posTextY + textY), self.font, fontscale, (0, 180, 0), 1)
+        cv2.putText(img, panText, (posTextX, posTextY + (textY*1)), self.font, fontscale, (0, 180, 0), 1)
+        cv2.putText(img, tiltText, (posTextX, posTextY + (textY*2)), self.font, fontscale, (0, 180, 0), 1)
+        cv2.putText(img, upTimeText, (posTextX, posTextY + (textY*3)), self.font, fontscale, (0, 180, 0), 1)
+        cv2.putText(img, "FPS: "+str(int(fps)), (posTextX, posTextY + (textY*4)), self.font, fontscale, (0, 180, 0), 1)
         # end Info box
 
         # Debug box
